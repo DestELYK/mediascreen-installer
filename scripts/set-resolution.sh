@@ -9,7 +9,7 @@ if [[ "$@" == *"--resolution"* ]]; then
     exit 0
 fi
 
-if [ ! -f /boot/default/grub ]; then
+if [ ! -f /etc/default/grub ]; then
     echo "grub configuration file does not exist"
     exit 1
 fi
