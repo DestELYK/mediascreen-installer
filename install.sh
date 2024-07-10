@@ -62,8 +62,12 @@ source "/usr/local/bin/"
 
 full_install() {
     echo "Running full install..."
-    # Ask user for username to launch browser
-    read -p "Enter the username that autostarts: " username
+    # Check if username is provided as argument
+    if [ -n "$1" ]; then
+        username="$1"
+    else
+        read -p "Enter the username: " username
+    fi
 
     # Check if user exists
     if ! id "$username" >/dev/null 2>&1; then
@@ -111,25 +115,36 @@ show_menu() {
 # Function to run a selected script
 run_option() {
     if [ "$1" -eq 0 ]; then
-            full_install
+        full_install
     elif [ "$1" -le "${#menu_names[@]}" ]; then
-            local script="${script_filenames[$(($1-1))]}"
-            bash $script
-            if [ $? -ne 0 ]; then
-                    echo "Script failed: $script. Exiting..."
-                    exit 1
-            fi
+        local script="${script_filenames[$(($1-1))]}"
+        bash $script
+        if [ $? -ne 0 ]; then
+                echo "Script failed: $script. Exiting..."
+                exit 1
+        fi
     elif [ "$1" -eq "$((${#menu_names[@]}+1))" ]; then
-            echo "Exiting..."
-            exit
+        echo "Exiting..."
+        exit
     else
-            echo "Invalid option. Please try again."
+        echo "Invalid option. Please try again."
     fi
 }
 
 # Check for argument "--full-install"
-if [ "$1" = "--full-install" ]; then
-    full_install
+if [[ "$@" == *"--full-install"* ]]; then
+    # Check if --username is in arguments
+    if [[ "$@" == *"--username"* ]]; then
+        # Get the index of --username argument
+        index=$(echo "$@" | grep -bo -- "--username" | awk -F: '{print $1}')
+        # Get the value of --username argument
+        username=$(echo "$@" | cut -d' ' -f$((index + 1)))
+
+        full_install "$username"
+    else
+        full_install
+    fi
+
     exit
 fi
 
