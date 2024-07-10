@@ -62,8 +62,32 @@ source "/usr/local/bin/"
 
 full_install() {
     echo "Running full install..."
+    # Ask user for username to launch browser
+    read -p "Enter the username that autostarts: " username
+
+    # Check if user exists
+    if ! id "$username" >/dev/null 2>&1; then
+        # Create user with no password
+        useradd -m -s /bin/bash -p '*' "$username"
+        echo "User $username created with no password."
+    fi
+
+    while true; do
+        read -p "Enter the resolution (in the format '1920x1080', press Enter for default): " RESOLUTION
+
+        # Validate resolution format
+        if [[ $RESOLUTION =~ ^[0-9]+x[0-9]+$ ]]; then
+            break
+        elif [[ -z $RESOLUTION ]]; then
+            RESOLUTION="1920x1080"
+            break
+        else
+            echo "Invalid resolution format. Please enter in the format '1920x1080'."
+        fi
+    done
+
     for script in "${script_filenames[@]}"; do
-        bash "$script"
+        bash "$script" --username "$username" --resolution "$RESOLUTION"
         if [ $? -ne 0 ]; then
             echo "Script failed: ${script}. Exiting..."
             exit 1

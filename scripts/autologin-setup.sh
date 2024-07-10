@@ -7,13 +7,19 @@ fi
 
 echo "Configuring AutoLogin..."
 
-# Ask user for username to autostart
-read -p "Enter the username to autostart: " username
+# Check if --username is in arguments
+if [[ "$@" == *"--username"* ]]; then
+    # Get the index of --username argument
+    index=$(echo "$@" | grep -bo -- "--username" | awk -F: '{print $1}')
+    # Get the value of --username argument
+    username=$(echo "$@" | cut -d' ' -f$((index + 1)))
+else
+    # Ask user for username to launch browser
+    read -p "Enter the username that autostarts: " username
+fi
 
 # Check if user exists
-if id "$username" >/dev/null 2>&1; then
-    echo "User $username already exists."
-else
+if ! id "$username" >/dev/null 2>&1; then
     # Create user with no password
     useradd -m -s /bin/bash -p '*' "$username"
     echo "User $username created with no password."

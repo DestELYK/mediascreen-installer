@@ -7,8 +7,16 @@ fi
 
 echo "Configuring Browser Launch..."
 
-# Ask user for username to launch browser
-read -p "Enter the username that autostarts: " username
+# Check if --username is in arguments
+if [[ "$@" == *"--username"* ]]; then
+    # Get the index of --username argument
+    index=$(echo "$@" | grep -bo -- "--username" | awk -F: '{print $1}')
+    # Get the value of --username argument
+    username=$(echo "$@" | cut -d' ' -f$((index + 1)))
+else
+    # Ask user for username to launch browser
+    read -p "Enter the username that autostarts: " username
+fi
 
 # Check if user exists
 if ! id "$username" >/dev/null 2>&1; then
@@ -36,26 +44,19 @@ if [[ $tries -eq 3 && ! $url =~ ^https?:// ]]; then
     exit 1
 fi
 
-# Ask for resolution until a valid format is entered
-TRIES=0
-while true; do
-    read -p "Enter the resolution (in the format '1920x1080'): " RESOLUTION
+# Check if --resolution is in arguments
+if [[ "$@" == *"--resolution"* ]]; then
+    # Get the index of --resolution argument
+    index=$(echo "$@" | grep -bo -- "--resolution" | awk -F: '{print $1}')
+    # Get the value of --resolution argument
+    resolution=$(echo "$@" | cut -d' ' -f$((index + 1)))
+else
+    echo "No resolution provided. Defaulting to 1920x1080..."
+    resolution="1920x1080"
+fi
 
-    # Validate resolution format
-    if [[ $RESOLUTION =~ ^[0-9]+x[0-9]+$ ]]; then
-        break
-    else
-        echo "Invalid resolution format. Please enter in the format '1920x1080'."
-        TRIES=$((TRIES+1))
-        if [ $TRIES -eq 3 ]; then
-            echo "Exceeded maximum number of tries. Exiting..."
-            exit 1
-        fi
-    fi
-done
-
-# Format resolution (chromium requires comma-separated resolution)
-FORMATTED_RESOLUTION=$(echo "$RESOLUTION" | sed 's/x/,/')
+# Format resolution for later use
+FORMATTED_RESOLUTION=$(echo $resolution | tr 'x' ',')
 
 # Automatic Browser Launch
 echo "Installing required packages for browser launch..."
