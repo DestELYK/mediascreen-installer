@@ -47,9 +47,10 @@ fi
 
 # Check if --resolution is in arguments
 if [[ "$@" == *"--resolution"* ]]; then
-    # Get the index of --resolution argument
-    index=$(echo "$@" | grep -bo -- "--resolution" | awk -F: '{print $1}')
-    # Get the value of --resolution argument
+    # Get index of --username argument
+    index=$(echo "$@" | grep -o -n -- "--resolution" | cut -d ":" -f 1)
+
+    # Get the value of --username argument
     resolution=$(echo "$@" | cut -d' ' -f$((index + 1)))
 else
     echo "No resolution provided. Defaulting to 1920x1080..."
