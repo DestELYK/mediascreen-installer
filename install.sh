@@ -31,7 +31,6 @@ echo "Connected to the internet."
 # Base URL for scripts and configuration file
 base_url="https://raw.githubusercontent.com/DestELYK/mediascreen-installer/main"
 config_url="${base_url}/menu_config.txt"
-base_url+="/scripts"
 
 # Temporary directory for downloads
 tmp_dir=$(mktemp -d)
@@ -45,12 +44,14 @@ declare -a menu_names
 declare -a menu_descriptions
 declare -a script_filenames
 while IFS=, read -r name description filename; do
+    filename=$(echo $filename | tr -d '\r') # Remove carriage return
+
     menu_names+=("$name")
     menu_descriptions+=("$description")
     script_filenames+=("$filename")
-    echo "Downloading $name script..."
+    echo "Downloading $name script as $filename..."
     # Download the script file
-    wget -q "${base_url}/${filename}" -O "${filename}"
+    wget -q "${base_url}/scripts/${filename}" -O "${filename}"
     # Move the script file to /usr/local/bin
     mv "${filename}" "/usr/local/bin/${filename}"
 
@@ -88,7 +89,7 @@ full_install() {
     done
 
     for script in "${script_filenames[@]}"; do
-        bash "$script" --username "$username" --resolution "$RESOLUTION"
+        bash -c "'$script' --username '$username' --resolution '$RESOLUTION'"
         if [ $? -ne 0 ]; then
             echo "Script failed: ${script}. Exiting..."
             exit 1
