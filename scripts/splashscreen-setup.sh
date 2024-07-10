@@ -64,7 +64,12 @@ echo "Setting default plymouth theme..."
 plymouth-set-default-theme -R spinner
 
 echo "Creating long_splash.conf file for making the splash screen longer at startup..."
-mkdir /etc/systemd/system/plymouth-quit.service.d && sudo sh -c  "echo '[Unit]
+
+if [ ! -d "/etc/systemd/system/plymouth-quit.service.d" ]; then
+    mkdir /etc/systemd/system/plymouth-quit.service.d
+fi
+
+sh -c  "echo '[Unit]
 Description=Make Plymouth Boot Screen last longer
 
 [Service]
