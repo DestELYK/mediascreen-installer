@@ -18,7 +18,7 @@ read -p "Enter your choice: " choice
 if [ "$choice" == "1" ]; then
     echo "Please upload the watermark.png file into /home/${SUDO_USER}."
     echo Available IP addresses:
-    ip addr show | grep -oP '(?<=inet\s)\d+(\.\d+){3}'
+    ip addr show | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | grep -v '127.0.0.1'
     echo -e $'\nOnce uploaded, press Enter to continue.'
     read
     echo "Checking for watermark..."
