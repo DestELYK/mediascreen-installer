@@ -58,13 +58,12 @@ done < menu_config.txt
 
 full_install() {
     echo "Running full install..."
-    for ((i=0; i<${#menu_names[@]}; i++)); do
-            local script="${script_filenames[$i]}"
-            bash $script
-            if [ $? -ne 0 ]; then
-                    echo "Script failed: $script. Exiting..."
-                    exit 1
-            fi
+    for script in "${script_filenames[@]}"; do
+        bash "/usr/local/bin/${script}"
+        if [ $? -ne 0 ]; then
+            echo "Script failed: ${script}. Exiting..."
+            exit 1
+        fi
     done
 }
 
