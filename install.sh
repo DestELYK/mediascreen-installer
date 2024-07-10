@@ -57,9 +57,6 @@ while IFS=, read -r name description filename; do
     chmod +x "/usr/local/bin/${filename}"
 done < menu_config.txt
 
-# Source the script file
-source "/usr/local/bin/"
-
 full_install() {
     echo "Running full install..."
     # Check if username is provided as argument
@@ -135,10 +132,11 @@ run_option() {
 if [[ "$@" == *"--full-install"* ]]; then
     # Check if --username is in arguments
     if [[ "$@" == *"--username"* ]]; then
-        # Get the index of --username argument
-        index=$(echo "$@" | grep -bo -- "--username" | awk -F: '{print $1}')
+        # Get index of --username argument
+        index=$(echo "$@" | grep -o -n -- "--username" | cut -d ":" -f 1)
+
         # Get the value of --username argument
-        username=$(echo "$@" | cut -d' ' -f$((index + 1)))
+        username=$(echo "$@" | cut -d' ' -f$((index + 2)))
 
         full_install "$username"
     else

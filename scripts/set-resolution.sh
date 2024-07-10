@@ -16,10 +16,11 @@ fi
 
 # Check if --username is in arguments
 if [[ "$@" == *"--username"* ]]; then
-    # Get the index of --username argument
-    index=$(echo "$@" | grep -bo -- "--username" | awk -F: '{print $1}')
+    # Get index of --username argument
+    index=$(echo "$@" | grep -o -n -- "--username" | cut -d ":" -f 1)
+
     # Get the value of --username argument
-    username=$(echo "$@" | cut -d' ' -f$((index + 1)))
+    username=$(echo "$@" | cut -d' ' -f$((index + 2)))
 else
     # Ask user for username to launch browser
     read -p "Enter the username that autostarts: " username
