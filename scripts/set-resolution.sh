@@ -55,12 +55,12 @@ done
 
 # Update GRUB configuration
 # Check if GRUB_GFXMODE is set
-if grep -q "^GRUB_GFXMODE=" /boot/default/grub; then
+if grep -q "^GRUB_GFXMODE=" /etc/default/grub; then
     # Replace GRUB_GFXMODE with new resolution
-    sed -i "s/^GRUB_GFXMODE=.*/GRUB_GFXMODE=$RESOLUTION/" /boot/default/grub
+    sed -i "s/^GRUB_GFXMODE=.*/GRUB_GFXMODE=$RESOLUTION/" /etc/default/grub
 else
-    # Insert GRUB_GFXMODE into /boot/default/grub
-    echo "GRUB_GFXMODE=$RESOLUTION" >> /boot/default/grub
+    # Insert GRUB_GFXMODE into /etc/default/grub
+    echo "GRUB_GFXMODE=$RESOLUTION" >> /etc/default/grub
 fi
 
 # Format resolution (chromium requires comma-separated resolution)
