@@ -51,7 +51,10 @@ while IFS=, read -r name description filename; do
     script_filenames+=("$filename")
     echo "Downloading $name script as $filename..."
     # Download the script file
-    wget -q "${base_url}/scripts/${filename}" -O "${filename}"
+    wget -q "${base_url}/scripts/${filename}" -O "${filename}" || {
+        echo "Failed to download script: ${filename}. Exiting..."
+        exit 1
+    }
     # Move the script file to /usr/local/bin
     mv "${filename}" "/usr/local/bin/${filename}"
 
