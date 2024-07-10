@@ -1,0 +1,7 @@
+Wi-Fi Setup,Modify Wifi Connection,wifi-setup.sh
+Auto Login Setup,Allows the system to automatically boot into a user,autologin-setup.sh
+Browser Setup,Launches a browser on startup,browser-setup.sh
+Hide Grub,Hides the grub menu from showing on boot,hide-grub.sh
+Splash Screen,Enables a splash screen when system is loading,splashscreen-setup.sh
+Firewall Setup,Enables firewall protection,firewall-setup.sh
+Auto Updates Setup,Enables automatic updates,autoupdates-setup.sh

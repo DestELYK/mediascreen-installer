@@ -1,0 +1,22 @@
+#!/bin/bash
+
+if [ "$EUID" -ne 0 ]
+  then echo "Please run as root"
+  exit
+fi
+
+# Automatic Updates and Reboots
+echo "Installing unattended-upgrades and apt-listchanges..."
+apt install unattended-upgrades apt-listchanges -y
+
+echo "Configuring automatic updates and reboots..."
+sh -c "echo 'Unattended-Upgrade::Allowed-Origins {
+    \"\${distro_id}:\${distro_codename}-security\";
+};
+Unattended-Upgrade::Automatic-Reboot \"true\";
+Unattended-Upgrade::Automatic-Reboot-Time \"02:00\";' >> /etc/apt/apt.conf.d/50unattended-upgrades"
+
+sh -c "echo 'APT::Periodic::Update-Package-Lists \"1\";
+APT::Periodic::Unattended-Upgrade \"1\";' >> /etc/apt/apt.conf.d/20auto-upgrades"
+
+sh -c "echo '0 0 * * 0 /sbin/shutdown -r now' > /etc/cron.d/reboot"
