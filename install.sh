@@ -31,6 +31,7 @@ echo "Connected to the internet."
 # Base URL for scripts and configuration file
 base_url="https://raw.githubusercontent.com/DestELYK/mediascreen-installer/main"
 config_url="${base_url}/menu_config.txt"
+base_url+="/scripts"
 
 # Temporary directory for downloads
 tmp_dir=$(mktemp -d)
@@ -52,19 +53,25 @@ while IFS=, read -r name description filename; do
     wget -q "${base_url}/${filename}" -O "${filename}"
     # Move the script file to /usr/local/bin
     mv "${filename}" "/usr/local/bin/${filename}"
-    # Source the script file
-    source "/usr/local/bin/${filename}"
+
+    chmod +x "/usr/local/bin/${filename}"
 done < menu_config.txt
+
+# Source the script file
+source "/usr/local/bin/"
 
 full_install() {
     echo "Running full install..."
     for script in "${script_filenames[@]}"; do
-        bash "/usr/local/bin/${script}"
+        bash "$script"
         if [ $? -ne 0 ]; then
             echo "Script failed: ${script}. Exiting..."
             exit 1
         fi
     done
+    echo "Rebooting in 5 seconds..."
+    sleep 5
+    reboot
 }
 
 # Function to display the menu
