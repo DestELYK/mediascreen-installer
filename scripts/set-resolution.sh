@@ -67,5 +67,5 @@ fi
 FORMATTED_RESOLUTION=$(echo "$RESOLUTION" | sed 's/x/,/')
 
 if [ -f "/home/$username/.xinitrc" ]; then
-    sed -i "s/--window-size=.*/--window-size=$FORMATTED_RESOLUTION/" "/home/$username/.xinitrc"
+    sed -i "s/--window-size=.*\\/--window-size=$FORMATTED_RESOLUTION \\/" "/home/$username/.xinitrc"
 fi
