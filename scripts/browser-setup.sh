@@ -79,17 +79,17 @@ xset s off
 xset s noblank
 
 unclutter &
-chromium $url \
-    --window-size=$FORMATTED_RESOLUTION \
-    --window-position=0,0 \
-    --start-fullscreen \
-    --kiosk \
-    --noerrdialogs \
-    --disable-translate \
-    --no-first-run \
-    --fast \
-    --fast-start \
-    --disable-infobars \
-    --disable-features=TranslateUI \
-    --overscroll-history-navigation=0 \
+chromium $url \\
+    --window-size=$FORMATTED_RESOLUTION \\
+    --window-position=0,0 \\
+    --start-fullscreen \\
+    --kiosk \\
+    --noerrdialogs \\
+    --disable-translate \\
+    --no-first-run \\
+    --fast \\
+    --fast-start \\
+    --disable-infobars \\
+    --disable-features=TranslateUI \\
+    --overscroll-history-navigation=0 \\
     --disable-pinch' > ~/.xinitrc"
