@@ -13,7 +13,7 @@ if [[ "$@" == *"--username"* ]]; then
     index=$(echo "$@" | grep -o -n -- "--username" | cut -d ":" -f 1)
 
     # Get the value of --username argument
-    username=$(echo "$@" | cut -d' ' -f$((index + 2)))
+    username=$(echo "$@" | cut -d' ' -f$((index + 1)))
 else
     # Ask user for username to launch browser
     read -p "Enter the username that autostarts: " username
