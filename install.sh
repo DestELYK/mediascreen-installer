@@ -104,11 +104,8 @@ full_install() {
         fi
     done
 
-    echo $RESOLUTION
-    echo $username
-
     for script in "${script_filenames[@]}"; do
-        bash -c "'$script' --username '$username' --resolution '$RESOLUTION'"
+        bash -c "'$script' --username='$username' --resolution='$RESOLUTION'"
         if [ $? -ne 0 ]; then
             echo "Script failed: ${script}. Exiting..."
             exit 1
