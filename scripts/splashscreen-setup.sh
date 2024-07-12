@@ -1,5 +1,16 @@
 #!/bin/bash
 
+<<comment
+    This script sets up a splash screen for the Debian System.
+
+    The script installs plymouth and plymouth-themes, allows the user to add a boot logo, and sets the default plymouth theme.
+
+    This script requires root privileges. Please run as root.
+
+    Author: DestELYK
+    Date: 07-09-2024
+comment
+
 if [ "$EUID" -ne 0 ]
   then echo "Please run as root"
   exit
@@ -33,7 +44,10 @@ echo "Please choose an option:"
         tries=0
         while [ $tries -lt 3 ]; do
             read -p "Enter the URL of the watermark.png file: " url
-            wget -q --spider $url
+            wget -q --spider $url || {
+                echo "Failed to download the watermark.png file. Please try again."
+                tries=$((tries+1))
+            }
             if [ $? -eq 0 ]; then
                 break
             else
@@ -43,8 +57,7 @@ echo "Please choose an option:"
         done
 
         if [ $tries -eq 3 ]; then
-            echo "Failed to download the watermark.png file. Exiting."
-            exit 1
+            echo "Failed to download the watermark.png file. Would you like to "
         fi
 
         echo "Downloading the watermark.png file..."
@@ -59,12 +72,13 @@ echo "Please choose an option:"
 }
 
 if [ ! -f "/usr/share/plymouth/themes/spinner/watermark.png" ]; then
-    echo "Watermark not found..."
-
-    modify_watermark
+    echo "Watermark not found."
+    read -p "Do you want to add a watermark? (y/n): " answer
+    if [ "$answer" == "y" ]; then
+        modify_watermark
+    fi
 else
     echo "Watermark found."
-
     read -p "Do you want to modify the watermark? (y/n): " answer
     if [ "$answer" == "y" ]; then
         modify_watermark

@@ -1,5 +1,21 @@
 #!/bin/bash
 
+<<comment
+    This script sets up autologin for a user on tty1.
+
+    The script creates a user if it does not exist, sets up autologin for the user on tty1, and updates the number of virtual terminals in logind.conf.
+
+    This script requires root privileges. Please run as root.
+
+    Command line usage:
+        - To set up autologin for a specific user:
+            sudo ./autologin-setup.sh --username=<username>
+
+    Author: DestELYK
+    Date: 07-09-2024
+comment
+
+
 if [ "$EUID" -ne 0 ]
   then echo "Please run as root"
   exit
@@ -8,23 +24,34 @@ fi
 echo "Configuring AutoLogin..."
 
 # Check if --username is in arguments
-if [[ "$@" == *"--username"* ]]; then
-    # Get index of --username argument
-    index=$(echo "$@" | grep -o -n -- "--username" | cut -d ":" -f 1)
+for arg in "$@"; do
+    case $arg in
+        --username=*)
+            username="${arg#*=}"
+        ;;
+    esac
+done
 
-    # Get the value of --username argument
-    username=$(echo "$@" | cut -d' ' -f$((index + 1)))
-else
+# Check if --username is in arguments
+if [[ -z "$username" ]]; then
     # Ask user for username to launch browser
     read -p "Enter the username that autostarts: " username
 fi
 
 # Check if user exists
 if ! id "$username" >/dev/null 2>&1; then
+    #Validate username
+    if [[ ! $username =~ ^[a-zA-Z0-9_]+$ ]]; then
+        echo "Invalid username. Please use only alphanumeric characters and underscores. Exiting..."
+        exit 1
+    fi
+
     # Create user with no password
     useradd -m -s /bin/bash -p '*' "$username"
     echo "User $username created with no password."
 fi
+
+echo "Setting up autologin for $username..."
 
 # Create systemd service file for getty@tty1
 if [ ! -d "/etc/systemd/system/getty@tty1.service.d" ]; then

@@ -1,5 +1,26 @@
 #!/bin/bash
 
+<<comment
+    This script configures the browser to launch on startup.
+
+    The script installs the required packages for browser launch, configures the browser to launch on startup, and sets the resolution for the browser.
+
+    This script requires root privileges. Please run as root.
+
+    Command Line Usage:
+        - To configure the browser launch:
+            sudo ./browser-setup.sh
+        - To configure the browser launch with a specific username:
+            sudo ./browser-setup.sh --username=<username>
+        - To configure the browser launch with a specific resolution:
+            sudo ./browser-setup.sh --resolution=<resolution>
+        - To configure the browser launch with a specific username and resolution:
+            sudo ./browser-setup.sh --username=<username> --resolution=<resolution>
+
+    Author: DestELYK
+    Date: 07-09-2024
+comment
+
 if [ "$EUID" -ne 0 ]
   then echo "Please run as root"
   exit
@@ -7,14 +28,26 @@ fi
 
 echo "Configuring Browser Launch..."
 
-# Check if --username is in arguments
-if [[ "$@" == *"--username"* ]]; then
-    # Get index of --username argument
-    index=$(echo "$@" | grep -o -n -- "--username" | cut -d ":" -f 1)
+# Check if --username or --resolution is in arguments
+for arg in "$@"; do
+    case $arg in
+        --username=*)
+            username="${arg#*=}"
+        ;;
+        --resolution=*)
+            resolution="${arg#*=}"
 
-    # Get the value of --username argument
-    username=$(echo "$@" | cut -d' ' -f$((index + 1)))
-else
+            # Validate resolution format
+            if [[ ! $resolution =~ ^[0-9]+x[0-9]+$ ]]; then
+                echo "Invalid resolution format. Please enter in the format '1920x1080'. Exiting..."
+                exit 1
+            fi
+        ;;
+    esac
+done
+
+# Check if --username is in arguments
+if [[ -z "$username" ]]; then
     # Ask user for username to launch browser
     read -p "Enter the username that autostarts: " username
 fi
@@ -45,16 +78,12 @@ if [[ $tries -eq 3 && ! $url =~ ^https?:// ]]; then
     exit 1
 fi
 
-# Check if --resolution is in arguments
-if [[ "$@" == *"--resolution"* ]]; then
-    # Get index of --username argument
-    index=$(echo "$@" | grep -o -n -- "--resolution" | cut -d ":" -f 1)
-
-    # Get the value of --username argument
-    resolution=$(echo "$@" | cut -d' ' -f$((index + 1)))
-else
+# Check if resolution is set
+if [[ -z "$resolution" ]]; then
     echo "No resolution provided. Defaulting to 1920x1080..."
     resolution="1920x1080"
+else
+    echo "Setting resolution to $resolution..."
 fi
 
 # Format resolution for later use
@@ -65,7 +94,7 @@ echo "Installing required packages for browser launch..."
 apt-get install --no-install-recommends xserver-xorg-video-all xserver-xorg-input-all xserver-xorg-core xinit x11-xserver-utils chromium unclutter -y
 
 # Checks if the logged in user is using the display and using tty1
-echo "Configuring browser launch..."
+echo "Configuring browser launch for $username..."
 su - $username -c "echo 'if [ -z \$DISPLAY ] && [ \$(tty) = /dev/tty1 ]
 then
     exec startx &>/dev/null

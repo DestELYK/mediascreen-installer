@@ -1,24 +1,24 @@
 #!/bin/bash
 
-"""
-This script installs the required scripts for the MediaScreen system.
+<<comment
+    This script installs the required scripts for the MediaScreen system.
 
-The script downloads the configuration file and required scripts from the GitHub repository.
-The user can choose to run a specific script or run the full installation.
+    The script downloads the configuration file and required scripts from the GitHub repository.
+    The user can choose to run a specific script or run the full installation.
 
-This script requires root privileges. Please run as root.
+    This script requires root privileges. Please run as root.
 
-Command Usage:
-    - To run the full installation:
-        sudo bash install.sh --full-install
-    - To run the full installation and autolaunch with specific username:
-        sudo bash install.sh --full-install --username <username>
-    - To run a specific script:
-        sudo bash install.sh
+    Command Usage:
+        - To run the full installation:
+            sudo bash install.sh --full-install
+        - To run the full installation and autolaunch with specific username:
+            sudo bash install.sh --full-install --username=<username>
+        - To run a specific script:
+            sudo bash install.sh
 
-Author: DestELYK
-Date: 07-09-2024
-"""
+    Author: DestELYK
+    Date: 07-09-2024
+comment
 
 if [ "$EUID" -ne 0 ]; then
     echo "Please run as root"
@@ -104,6 +104,9 @@ full_install() {
         fi
     done
 
+    echo $RESOLUTION
+    echo $username
+
     for script in "${script_filenames[@]}"; do
         bash -c "'$script' --username '$username' --resolution '$RESOLUTION'"
         if [ $? -ne 0 ]; then
@@ -176,21 +179,22 @@ run_option() {
     esac
 }
 
+FULL_INSTALL=false
+
+for arg in "$@"; do
+    case $arg in
+        --full-install)
+            FULL_INSTALL=true
+        ;;
+        --username=*)
+            USERNAME="${arg#*=}"
+        ;;
+    esac
+done
+
 # Check for argument "--full-install"
 if [[ "$@" == *"--full-install"* ]]; then
-    # Check if --username is in arguments
-    if [[ "$@" == *"--username"* ]]; then
-        # Get index of --username argument
-        index=$(echo "$@" | grep -o -n -- "--username" | cut -d ":" -f 1)
-
-        # Get the value of --username argument
-        username=$(echo "$@" | cut -d' ' -f$((index + 2)))
-
-        full_install "$username"
-    else
-        full_install
-    fi
-
+    full_install "$USERNAME"
     exit
 fi
 

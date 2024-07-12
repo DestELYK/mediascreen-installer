@@ -1,5 +1,16 @@
 #!/bin/bash
 
+<<comment
+    This script configures the firewall to allow only specified IP subnets.
+    
+    The script installs ufw and configures the firewall to allow only specified IP subnets.
+    
+    This script requires root privileges. Please run as root.
+
+    Author: DestELYK
+    Date: 07-09-2024
+comment
+
 if [ "$EUID" -ne 0 ]
   then echo "Please run as root"
   exit
@@ -11,6 +22,9 @@ apt install ufw -y
 
 echo "Configuring firewall rules..."
 ufw default deny incoming
+
+echo Available IP addresses:
+ip addr show | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | grep -v '127.0.0.1'
 
 # Ask for IP subnet
 while true; do

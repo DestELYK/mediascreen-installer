@@ -1,5 +1,16 @@
 #!/bin/bash
 
+<<comment
+    This script is used to reconfigure the WiFi connection and timezone settings.
+
+    The script checks the internet connection and prompts the user to reconfigure the WiFi connection if not connected. It also reconfigures the timezone settings.
+
+    This script requires root privileges. Please run as root.
+
+    Author: DestELYK
+    Date: 07-09-2024
+comment
+
 if [ "$EUID" -ne 0 ]
   then echo "Please run as root"
   exit

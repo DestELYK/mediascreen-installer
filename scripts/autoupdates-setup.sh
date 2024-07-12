@@ -1,5 +1,16 @@
 #!/bin/bash
 
+<<comment
+    This script configures automatic updates and reboots.
+    
+    The script installs unattended-upgrades and apt-listchanges, configures automatic updates and reboots, and schedules a weekly reboot.
+    
+    This script requires root privileges. Please run as root.
+
+    Author: DestELYK
+    Date: 07-09-2024
+comment
+
 if [ "$EUID" -ne 0 ]
   then echo "Please run as root"
   exit

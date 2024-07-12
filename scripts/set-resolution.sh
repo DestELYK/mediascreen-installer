@@ -1,11 +1,38 @@
 #!/bin/bash
 
+<<comment
+    This script sets the resolution for the media screen.
+
+    The script sets the resolution by updating the GRUB configuration file and .xinitrc file.
+
+    This script requires root privileges. Please run as root.
+
+    Author: DestELYK
+    Date: 07-09-2024
+comment
+
 if [ "$EUID" -ne 0 ]; then
     echo "Please run as root"
     exit 1
 fi
 
-if [[ "$@" == *"--resolution"* ]]; then
+for arg in "$@"; do
+    case $arg in
+        --resolution=*)
+            resolution="${arg#*=}"
+            # Validate resolution format
+            if [[ ! $resolution =~ ^[0-9]+x[0-9]+$ ]]; then
+                echo "Invalid resolution format. Please enter in the format '1920x1080'. Exiting..."
+                exit 1
+            fi
+        ;;
+        --username=*)
+            username="${arg#*=}"
+        ;;
+    esac
+done
+
+if [[ ! -z "$resolution" ]]; then
     exit 0
 fi
 
@@ -15,13 +42,7 @@ if [ ! -f /etc/default/grub ]; then
 fi
 
 # Check if --username is in arguments
-if [[ "$@" == *"--username"* ]]; then
-    # Get index of --username argument
-    index=$(echo "$@" | grep -o -n -- "--username" | cut -d ":" -f 1)
-
-    # Get the value of --username argument
-    username=$(echo "$@" | cut -d' ' -f$((index + 1)))
-else
+if [[ -z "$username" ]]; then
     # Ask user for username to launch browser
     read -p "Enter the username that autostarts: " username
 fi
@@ -31,6 +52,8 @@ if ! id "$username" >/dev/null 2>&1; then
     echo "User $username does not exist. Exiting..."
     exit 1
 fi
+
+echo "Configuring resolution for $username..."
 
 # Ask for resolution until a valid format is entered
 TRIES=0
