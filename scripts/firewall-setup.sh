@@ -11,6 +11,12 @@
     Date: 07-09-2024
 comment
 
+# Check if the system is using Debian
+if [[ ! -f /etc/debian_version ]]; then
+    echo "System is not using Debian. Exiting..."
+    exit 1
+fi
+
 if [ "$EUID" -ne 0 ]
   then echo "Please run as root"
   exit
