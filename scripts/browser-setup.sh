@@ -49,6 +49,14 @@ for arg in "$@"; do
                 exit 1
             fi
         ;;
+        --url=*)
+            url="${arg#*=}"
+
+            # Validate URL format
+            if [[ ! $url =~ ^https?:// ]]; then
+                echo "Invalid URL format. Please enter a valid URL starting with http:// or https://. Exiting..."
+                exit 1
+            fi
     esac
 done
 
@@ -64,24 +72,26 @@ if ! id "$username" >/dev/null 2>&1; then
     exit 1
 fi
 
-# Ask for URL to launch
-tries=0
-while [[ $tries -lt 3 ]]; do
-    read -p "Enter the URL to launch: " url
+if [ -z "$url" ]; then
+    # Ask for URL to launch
+    tries=0
+    while [[ $tries -lt 3 ]]; do
+        read -p "Enter the URL to launch: " url
 
-    # Loop to validate URL
-    if [[ $url =~ ^https?:// ]]; then
-        break
-    else
-        echo "Invalid URL. Please enter a valid URL starting with http:// or https://"
-        tries=$((tries + 1))
+        # Loop to validate URL
+        if [[ $url =~ ^https?:// ]]; then
+            break
+        else
+            echo "Invalid URL. Please enter a valid URL starting with http:// or https://"
+            tries=$((tries + 1))
+        fi
+    done
+
+    # Exit if URL is not provided after 3 tries
+    if [[ $tries -eq 3 && ! $url =~ ^https?:// ]]; then
+        echo "URL not provided. Exiting..."
+        exit 1
     fi
-done
-
-# Exit if URL is not provided after 3 tries
-if [[ $tries -eq 3 && ! $url =~ ^https?:// ]]; then
-    echo "URL not provided. Exiting..."
-    exit 1
 fi
 
 # Check if resolution is set
