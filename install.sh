@@ -104,7 +104,7 @@ full_install() {
 
     for script in "${script_filenames[@]}"; do
         arguments="--username='$username' --resolution='$RESOLUTION'"
-        if -n "$2"; then
+        if [ -n "$2" ]; then
             arguments+=" --url='$2'"
         fi
 

@@ -85,8 +85,7 @@ sed -i "s/#NAutoVTs=6/NAutoVTs=3/" /etc/systemd/logind.conf
 
 su - $username -c "touch ~/.hushlogin"
 
-# Checks if the logged in user is using the display and using tty1
-echo "Configuring browser launch for $username..."
+# Checks if the logged in user is using the display and using tty1 or tty2
 su - $username -c "echo 'if [ -z $DISPLAY ]; then
   if [ $(tty) = /dev/tty1 ]; then
     exec startx &>/dev/null
