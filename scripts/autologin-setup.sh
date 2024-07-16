@@ -83,8 +83,8 @@ ExecStart=-/sbin/agetty --skip-login --nonewline --noissue --autologin $SUDO_USE
 # Update the number of virtual terminals in logind.conf
 sed -i "s/#NAutoVTs=6/NAutoVTs=3/" /etc/systemd/logind.conf
 
-su - $username -c "touch ~/.hushlogin"
+su - $username -c "touch /home/$username/.hushlogin"
 
 echo "Downloading autologin files..."
-su - $username -c "wget -q 'https://raw.githubusercontent.com/DestELYK/mediascreen-installer/main/autologin/browser' -O ~/.bash_profile"
-su - $SUDO_USER -c "wget -q 'https://raw.githubusercontent.com/DestELYK/mediascreen-installer/main/autologin/menu' -O ~/.bash_profile"
+su - $username -c "wget -q 'https://raw.githubusercontent.com/DestELYK/mediascreen-installer/main/autologin/browser' -O /home/$username/.bash_profile"
+su - $SUDO_USER -c "wget -q 'https://raw.githubusercontent.com/DestELYK/mediascreen-installer/main/autologin/menu' -O /home/$SUDO_USER/.bash_profile"
