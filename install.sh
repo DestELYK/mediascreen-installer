@@ -187,6 +187,7 @@ for arg in "$@"; do
         ;;
         --username=*)
             USERNAME="${arg#*=}"
+        ;;
         --url=*)
             URL="${arg#*=}"
         ;;
