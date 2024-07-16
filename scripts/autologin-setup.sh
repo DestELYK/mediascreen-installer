@@ -64,23 +64,56 @@ if [ ! -d "/etc/systemd/system/getty@tty1.service.d" ]; then
     echo "Created directory /etc/systemd/system/getty@tty1.service.d"
 fi
 
+# Create override.conf file for getty@tty1
 echo "[Service]
 ExecStart=
 ExecStart=-/sbin/agetty --skip-login --nonewline --noissue --autologin $username --noclear %I \$TERM" > /etc/systemd/system/getty@tty1.service.d/override.conf
 
-# Ask user for the amount of terminals
-while true; do
-    read -p "Enter the amount of terminals (minimum 1): " num_terminals
+# Create systemd service file for getty@tty2
+if [ ! -d "/etc/systemd/system/getty@tty2.service.d" ]; then
+    mkdir -p /etc/systemd/system/getty@tty2.service.d
+    echo "Created directory /etc/systemd/system/getty@tty2.service.d"
+fi
 
-    # Validate the input
-    if [[ ! $num_terminals =~ ^[1-9][0-9]*$ ]]; then
-        echo "Invalid input. Please enter a valid number greater than or equal to 1."
-    else
-        break
-    fi
-done
+# Create override.conf file for getty@tty2
+echo "[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --skip-login --nonewline --noissue --autologin $SUDO_USER --noclear %I \$TERM" > /etc/systemd/system/getty@tty2.service.d/override.conf
 
 # Update the number of virtual terminals in logind.conf
-sed -i "s/#NAutoVTs=6/NAutoVTs=$num_terminals/" /etc/systemd/logind.conf
+sed -i "s/#NAutoVTs=6/NAutoVTs=3/" /etc/systemd/logind.conf
 
 su - $username -c "touch ~/.hushlogin"
+
+# Checks if the logged in user is using the display and using tty1
+echo "Configuring browser launch for $username..."
+su - $username -c "echo 'if [ -z $DISPLAY ]; then
+  if [ $(tty) = /dev/tty1 ]; then
+    exec startx &>/dev/null
+  elif [ $(tty) = /dev/tty2 ]; then
+    echo "Waiting for connection..."
+    while ! ping -c 1 -W 1 google.com >/dev/null; do
+      sleep 1
+    done
+
+    echo "Downloading Media Screen Installer..."
+
+    wget -q 'https://raw.githubusercontent.com/DestELYK/mediascreen-installer/main/install.sh' -O install.sh || {
+      echo "Download failed. Please enter the URL:"
+      read -r new_url
+      wget -q "$new_url" -O install.sh || {
+        echo "Download failed again. Please check the URL and try again later."
+        exit 1
+      }
+    }
+
+    chmod +x install.sh
+
+    sudo mv install.sh /usr/local/bin/mediascreen-util.sh
+
+    echo "Launching Media Screen Installer..."
+
+    sudo bash mediascreen-util.sh
+  fi
+fi
+' > ~/.bash_profile"

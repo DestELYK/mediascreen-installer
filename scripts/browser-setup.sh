@@ -109,13 +109,6 @@ FORMATTED_RESOLUTION=$(echo $resolution | tr 'x' ',')
 echo "Installing required packages for browser launch..."
 apt-get install --no-install-recommends xserver-xorg-video-all xserver-xorg-input-all xserver-xorg-core xinit x11-xserver-utils chromium unclutter -y
 
-# Checks if the logged in user is using the display and using tty1
-echo "Configuring browser launch for $username..."
-su - $username -c "echo 'if [ -z \$DISPLAY ] && [ \$(tty) = /dev/tty1 ]
-then
-    exec startx &>/dev/null
-fi' > ~/.bash_profile"
-
 # Configures the browser to launch on startup
 echo "Creating .xinitrc file..."
 su - $username -c "echo '#!/usr/bin/env sh
