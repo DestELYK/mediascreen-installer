@@ -108,7 +108,11 @@ full_install() {
             arguments+=" --url='$2'"
         fi
 
-        bash -c "'$script' " + $arguments || {
+        command="$script $arguments"
+
+        echo "Running script: $command"
+
+        bash -c "$command" || {
             echo "Failed to run script: $script. Exiting..."
             exit 1
         }

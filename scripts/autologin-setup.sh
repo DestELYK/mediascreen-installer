@@ -85,34 +85,6 @@ sed -i "s/#NAutoVTs=6/NAutoVTs=3/" /etc/systemd/logind.conf
 
 su - $username -c "touch ~/.hushlogin"
 
-# Checks if the logged in user is using the display and using tty1 or tty2
-su - $username -c "echo 'if [ -z $DISPLAY ]; then
-  if [ $(tty) = /dev/tty1 ]; then
-    exec startx &>/dev/null
-  elif [ $(tty) = /dev/tty2 ]; then
-    echo "Waiting for connection..."
-    while ! ping -c 1 -W 1 google.com >/dev/null; do
-      sleep 1
-    done
-
-    echo "Downloading Media Screen Installer..."
-
-    wget -q 'https://raw.githubusercontent.com/DestELYK/mediascreen-installer/main/install.sh' -O install.sh || {
-      echo "Download failed. Please enter the URL:"
-      read -r new_url
-      wget -q "$new_url" -O install.sh || {
-        echo "Download failed again. Please check the URL and try again later."
-        exit 1
-      }
-    }
-
-    chmod +x install.sh
-
-    sudo mv install.sh /usr/local/bin/mediascreen-util.sh
-
-    echo "Launching Media Screen Installer..."
-
-    sudo bash mediascreen-util.sh
-  fi
-fi
-' > ~/.bash_profile"
+echo "Downloading autologin files..."
+su - $username -c "wget -q 'https://raw.githubusercontent.com/DestELYK/mediascreen-installer/main/autologin/browser' -O ~/.bash_profile"
+su - $SUDO_USER -c "wget -q 'https://raw.githubusercontent.com/DestELYK/mediascreen-installer/main/autologin/menu' -O ~/.bash_profile"
