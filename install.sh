@@ -103,11 +103,15 @@ full_install() {
     done
 
     for script in "${script_filenames[@]}"; do
-        bash -c "'$script' --username='$username' --resolution='$RESOLUTION'"
-        if [ $? -ne 0 ]; then
-            echo "Script failed: ${script}. Exiting..."
-            exit 1
+        arguments="--username='$username' --resolution='$RESOLUTION'"
+        if -n "$2"; then
+            arguments+=" --url='$2'"
         fi
+
+        bash -c "'$script' " + $arguments || {
+            echo "Failed to run script: $script. Exiting..."
+            exit 1
+        }
     done
     echo "Rebooting in 5 seconds..."
     sleep 5
@@ -183,13 +187,15 @@ for arg in "$@"; do
         ;;
         --username=*)
             USERNAME="${arg#*=}"
+        --url=*)
+            URL="${arg#*=}"
         ;;
     esac
 done
 
 # Check for argument "--full-install"
 if [[ "$@" == *"--full-install"* ]]; then
-    full_install "$USERNAME"
+    full_install "$USERNAME" "$URL"
     exit
 fi
 
