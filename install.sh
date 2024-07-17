@@ -13,7 +13,7 @@
             sudo bash install.sh --full-install
         - To run the full installation and autolaunch with specific username:
             sudo bash install.sh --full-install --username=<username>
-        - To run a specific script:
+        - To run menu and select a specific script:
             sudo bash install.sh
 
     Author: DestELYK

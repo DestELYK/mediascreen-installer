@@ -123,7 +123,7 @@ chromium $url \\
     --disable-infobars \\
     --disable-features=TranslateUI \\
     --overscroll-history-navigation=0 \\
-    --disable-pinch" > .xinitrc
+    --disable-pinch" > ~/.xinitrc
 
 chown $username:$username ~/.xinitrc
-mv .xinitrc /home/$username/.xinitrc
+mv ~/.xinitrc /home/$username/.xinitrc
