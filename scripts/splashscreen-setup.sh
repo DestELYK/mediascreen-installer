@@ -29,7 +29,7 @@ apt install plymouth plymouth-themes -y
 modify_watermark() {
 echo "Please choose an option:"
     echo "1. Upload a file"
-    echo "2. Paste a URL"
+    echo "2. Using a URL"
 
     read -p "Enter your choice: " choice
 

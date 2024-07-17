@@ -3,7 +3,7 @@
 <<comment
     This script configures the browser to launch on startup.
 
-    The script installs the required packages for browser launch, configures the browser to launch on startup, and sets the resolution for the browser.
+    The script installs the required packages for browser launch, configures the browser to launch on startup, and sets the url for the browser.
 
     This script requires root privileges. Please run as root.
 
@@ -12,10 +12,10 @@
             sudo ./browser-setup.sh
         - To configure the browser launch with a specific username:
             sudo ./browser-setup.sh --username=<username>
-        - To configure the browser launch with a specific resolution:
-            sudo ./browser-setup.sh --resolution=<resolution>
-        - To configure the browser launch with a specific username and resolution:
-            sudo ./browser-setup.sh --username=<username> --resolution=<resolution>
+        - To configure the browser launch with a specific url:
+            sudo ./browser-setup.sh --url=<url>
+        - To configure the browser launch with a specific username and url:
+            sudo ./browser-setup.sh --username=<username> --url=<url>
 
     Author: DestELYK
     Date: 07-09-2024
@@ -34,20 +34,11 @@ fi
 
 echo "Configuring Browser Launch..."
 
-# Check if --username or --resolution is in arguments
+# Check if --username or --url is in arguments
 for arg in "$@"; do
     case $arg in
         --username=*)
             username="${arg#*=}"
-        ;;
-        --resolution=*)
-            resolution="${arg#*=}"
-
-            # Validate resolution format
-            if [[ ! $resolution =~ ^[0-9]+x[0-9]+$ ]]; then
-                echo "Invalid resolution format. Please enter in the format '1920x1080'. Exiting..."
-                exit 1
-            fi
         ;;
         --url=*)
             url="${arg#*=}"
@@ -94,31 +85,23 @@ if [ -z "$url" ]; then
     fi
 fi
 
-# Check if resolution is set
-if [[ -z "$resolution" ]]; then
-    echo "No resolution provided. Defaulting to 1920x1080..."
-    resolution="1920x1080"
-else
-    echo "Setting resolution to $resolution..."
-fi
-
-# Format resolution for later use
-FORMATTED_RESOLUTION=$(echo $resolution | tr 'x' ',')
-
 # Automatic Browser Launch
 echo "Installing required packages for browser launch..."
 apt-get install --no-install-recommends xserver-xorg-video-all xserver-xorg-input-all xserver-xorg-core xinit x11-xserver-utils chromium unclutter -y
 
 # Configures the browser to launch on startup
 echo "Creating .xinitrc file..."
-su - $username -c "echo '#!/usr/bin/env sh
+echo "#!/usr/bin/env sh
 xset -dpms
 xset s off
 xset s noblank
 
+resolution=\$(xrandr | grep '*' | awk '{ print \$1 }')
+formatted_resolution=\$(echo \"\$resolution\" | sed 's/x/,/')
+
 unclutter &
 chromium $url \\
-    --window-size=$FORMATTED_RESOLUTION \\
+    --window-size=\$formatted_resolution \\
     --window-position=0,0 \\
     --start-fullscreen \\
     --kiosk \\
@@ -130,4 +113,7 @@ chromium $url \\
     --disable-infobars \\
     --disable-features=TranslateUI \\
     --overscroll-history-navigation=0 \\
-    --disable-pinch' > ~/.xinitrc"
+    --disable-pinch" > .xinitrc
+
+chown $username:$username ~/.xinitrc
+mv .xinitrc /home/$username/.xinitrc

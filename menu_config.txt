@@ -1,7 +1,6 @@
 Wi-Fi Setup,Modify Wifi Connection,wifi-setup.sh
 Hide Grub,Hides the grub menu from showing on boot,hide-grub.sh
 Splash Screen,Enables a splash screen when system is loading,splashscreen-setup.sh
-Set Resolution,Sets the device's resolution,set-resolution.sh
 Firewall Setup,Enables firewall protection,firewall-setup.sh
 Auto Updates Setup,Enables automatic updates,autoupdates-setup.sh
 Browser Setup,Launches a browser on startup,browser-setup.sh

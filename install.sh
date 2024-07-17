@@ -88,22 +88,8 @@ full_install() {
         echo "User $username created with no password."
     fi
 
-    while true; do
-        read -p "Enter the resolution (in the format '1920x1080', press Enter for default): " RESOLUTION
-
-        # Validate resolution format
-        if [[ $RESOLUTION =~ ^[0-9]+x[0-9]+$ ]]; then
-            break
-        elif [[ -z $RESOLUTION ]]; then
-            RESOLUTION="1920x1080"
-            break
-        else
-            echo "Invalid resolution format. Please enter in the format '1920x1080'."
-        fi
-    done
-
     for script in "${script_filenames[@]}"; do
-        arguments="--username='$username' --resolution='$RESOLUTION'"
+        arguments="--username='$username'"
         if [ -n "$2" ]; then
             arguments+=" --url='$2'"
         fi
