@@ -113,7 +113,8 @@ full_install() {
         echo "Running script: $command"
 
         bash -c "$command" || {
-            echo "Failed to run script: $script. Exiting..."
+            echo "Failed to run script: $script. Exiting in 10 seconds..."
+            sleep 10
             exit 1
         }
     done
