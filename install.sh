@@ -59,7 +59,6 @@ wget -q "${config_url}" -O menu_config.txt || {
 declare -a menu_names
 declare -a menu_descriptions
 declare -a script_filenames
-echo "Downloading required scripts..."
 while IFS=, read -r name description filename; do
     filename=$(echo $filename | tr -d '\r') # Remove carriage return
 
@@ -67,6 +66,7 @@ while IFS=, read -r name description filename; do
     menu_descriptions+=("$description")
     script_filenames+=("$filename")
     # Download the script file
+    echo "Downloading script: ${filename}"
     wget -q "${base_url}/scripts/${filename}" -O "${filename}" || {
         echo "Failed to download script: ${filename}. Exiting..."
         exit 1
