@@ -59,8 +59,10 @@ wget -q "${config_url}" -O menu_config.txt || {
 declare -a menu_names
 declare -a menu_descriptions
 declare -a script_filenames
-while IFS=, read -r name description filename; do
-    filename=$(echo $filename | tr -d '\r') # Remove carriage return
+while IFS="" read -r line || [ -n "$line" ]; do
+    IFS=',' read -r name description filename <<< "$line"
+    
+    filename=$(echo "$filename" | tr -d '\r') # Remove carriage return
 
     menu_names+=("$name")
     menu_descriptions+=("$description")
@@ -76,7 +78,6 @@ while IFS=, read -r name description filename; do
     
     # Move the script file to /usr/local/bin
     mv "${filename}" "/usr/local/bin/${filename}"
-
 done < menu_config.txt
 echo "Finished downloading required scripts"
 
