@@ -31,6 +31,16 @@ if [ "$EUID" -ne 0 ]; then
     exit
 fi
 
+function exit_prompt()
+{
+    read -p "Do you want to exit? (y/n): " EXIT
+    if [[ $EXIT =~ ^[Yy]$ ]]; then
+        exit 1
+    fi
+}
+
+trap exit_prompt SIGINT
+
 # Base URL for scripts and configuration file
 base_url="https://raw.githubusercontent.com/DestELYK/mediascreen-installer/main"
 config_url="${base_url}/menu_config.txt"

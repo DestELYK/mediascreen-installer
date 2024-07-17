@@ -22,6 +22,16 @@ if [ "$EUID" -ne 0 ]
   exit
 fi
 
+function exit_prompt()
+{
+    read -p "Do you want to exit? (y/n): " EXIT
+    if [[ $EXIT =~ ^[Yy]$ ]]; then
+        exit 1
+    fi
+}
+
+trap exit_prompt SIGINT
+
 # Automatic Updates and Reboots
 echo "Installing unattended-upgrades and apt-listchanges..."
 apt install unattended-upgrades apt-listchanges -y
