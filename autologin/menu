@@ -1,25 +1,25 @@
 if [ -z $DISPLAY ] && [ $(tty) = /dev/tty2 ]; then
-    echo "Waiting for connection..."
-    while ! ping -c 1 -W 1 google.com >/dev/null; do
-      sleep 1
-    done
+  echo "Waiting for connection..."
+  while ! ping -c 1 -W 1 google.com >/dev/null; do
+    sleep 1
+  done
 
-    echo "Downloading Media Screen Installer..."
+  echo "Downloading Media Screen Installer..."
 
-    wget -q 'https://raw.githubusercontent.com/DestELYK/mediascreen-installer/main/install.sh' -O install.sh || {
-      echo "Download failed. Please enter the URL:"
-      read -r new_url
-      wget -q "$new_url" -O install.sh || {
-        echo "Download failed again. Please check the URL and try again later."
-        exit 1
-      }
+  wget -q 'https://raw.githubusercontent.com/DestELYK/mediascreen-installer/main/install.sh' -O install.sh || {
+    echo "Download failed. Please enter the URL:"
+    read -r new_url
+    wget -q "$new_url" -O install.sh || {
+      echo "Download failed again. Please check the URL and try again later."
+      exit 1
     }
+  }
 
-    chmod +x install.sh
+  chmod +x install.sh
 
-    sudo mv install.sh /usr/local/bin/mediascreen-util.sh
+  sudo mv install.sh /usr/local/bin/mediascreen-util.sh
 
-    echo "Launching Media Screen Installer..."
+  echo "Launching Media Screen Installer..."
 
-    exec sudo mediascreen-util.sh --full-install --username='mediascreen' --url='https://app.novisign.com/wplayer/#/pages/home' && rm .bash_profile
+  exec sudo mediascreen-util.sh 
 fi
