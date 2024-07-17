@@ -24,6 +24,7 @@ fi
 
 function exit_prompt()
 {
+    echo
     read -p "Do you want to exit? (y/n): " EXIT
     if [[ $EXIT =~ ^[Yy]$ ]]; then
         exit 1
@@ -39,16 +40,19 @@ apt install --quiet ufw -y
 echo "Configuring firewall rules..."
 ufw default deny incoming
 
-echo "Current rules: "
-ufw status numbered
-
+rules=$(ufw status numbered | grep -E '^\[ [0-9]\]+')
 ips=$(ip addr show | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | grep -v '127.0.0.1')
 
-echo "Available IP addresses:"
-echo $ips
-
+#
 for ip in $ips; do
     subnet="$(echo $ip | cut -d. -f1-3).0"
+
+    # Check rules to see if subnet is already allowed
+    if echo "$rules" | grep -q "$subnet"; then
+        echo "Subnet $subnet is already allowed. Skipping..."
+        continue
+    fi
+
     read -p "Do you want to allow subnet $subnet? (y/n): " ADD_SUBNET
 
     if [[ ! $ADD_SUBNET =~ ^[Yy]$ ]]; then
@@ -79,11 +83,15 @@ done
 
 # Ask for IP subnet
 while true; do
+    echo "Current rules: "
+    echo "$rules"
     read -p "Do you want to add more IP subnets? (y/n): " ADD_MORE
     if [[ ! $ADD_MORE =~ ^[Yy]$ ]]; then
         break
     fi
 
+    echo "Available IP addresses:"
+    echo "$ips"
     read -p "Enter the IP subnet to allow (in the format '_._._._/__'): " IP_SUBNET
     # Validate IP subnet format
     if [[ ! $IP_SUBNET =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+$ ]]; then
