@@ -105,7 +105,7 @@ full_install() {
             arguments+=" --url='$2'"
         fi
 
-        command="$script $arguments"
+        command="$script -y $arguments"
 
         echo "Running script: $command"
 
