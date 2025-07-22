@@ -205,17 +205,59 @@ done < "$CONFIG_DIR/menu_config.txt"
 
 # Full installation function
 full_install() {
-    echo "Running full install..."
+    echo "Starting full MediaScreen installation..."
     
-    # Check if username is provided as argument
+    # Get username with validation
     local username=""
-    read -p "Enter the username: " username
+    while [[ -z "$username" ]]; do
+        read -p "Enter the username for MediaScreen: " username
+        
+        # Validate username using common library if available
+        if [[ -f "$COMMON_LIB" ]] && command -v validate_username >/dev/null 2>&1; then
+            if ! validate_username "$username"; then
+                username=""
+                echo "Please try again with a valid username."
+                continue
+            fi
+        else
+            # Fallback validation
+            if [[ ! $username =~ ^[a-zA-Z0-9_][a-zA-Z0-9_-]*$ ]]; then
+                echo "ERROR: Invalid username format. Use only alphanumeric characters, underscores, and hyphens."
+                username=""
+                continue
+            fi
+            
+            if [[ ${#username} -gt 32 ]]; then
+                echo "ERROR: Username too long. Maximum 32 characters allowed."
+                username=""
+                continue
+            fi
+        fi
+    done
 
-    # Check if user exists
-    if ! id "$username" >/dev/null 2>&1; then
-        # Create user with no password
-        useradd -m -s /bin/bash -p '*' "$username"
-        echo "User $username created with no password."
+    # Create user using common library if available
+    if [[ -f "$COMMON_LIB" ]] && command -v create_user_if_not_exists >/dev/null 2>&1; then
+        if ! create_user_if_not_exists "$username"; then
+            echo "ERROR: Failed to create user: '$username'"
+            echo "Press Enter to continue..."
+            read
+            return 1
+        fi
+    else
+        # Fallback user creation
+        if ! id "$username" >/dev/null 2>&1; then
+            echo "Creating user: $username"
+            if useradd -m -s /bin/bash -p '*' "$username"; then
+                echo "User $username created successfully."
+            else
+                echo "ERROR: Failed to create user: '$username'"
+                echo "Press Enter to continue..."
+                read
+                return 1
+            fi
+        else
+            echo "User $username already exists."
+        fi
     fi
 
     # Prepare common arguments for all scripts

@@ -1,68 +1,42 @@
 #!/bin/bash
 
-# Strict error handling
-set -euo pipefail
+# Source common library
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../lib/common.sh"
 
 <<comment
-    This script is used to reconfigure the WiFi connection and timezone settings.
-
-    The script checks the internet connection and prompts the user to reconfigure the WiFi connection if not connected. It also reconfigures the timezone settings.
-
-    This script requires root privileges. Please run as root.
-
+    MediaScreen Network Configuration Script
+    
+    This script configures network settings including Wi-Fi connections,
+    system time zone, and basic connectivity tests.
+    
+    Usage:
+        sudo bash configure-network.sh
+        sudo bash configure-network.sh -y
+        
+    Options:
+        -y, --auto    Run in automatic mode (non-interactive)
+        -h, --help    Show help message
+    
     Author: DestELYK
     Date: 07-09-2024
-    Updated: 07-21-2025 - Added improved error handling, modern network management, and security improvements
+    Updated: 07-22-2025 - Modernized to use common library
 comment
 
-# Logging setup
-LOG_FILE="/var/log/mediascreen-network.log"
-exec 1> >(tee -a "$LOG_FILE")
-exec 2> >(tee -a "$LOG_FILE" >&2)
+# Initialize common library
+init_common "network-config"
 
-log() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
-}
+# System checks
+check_debian
+check_root
 
-# Check if the system is using Debian
-if [[ ! -f /etc/debian_version ]]; then
-    log "ERROR: System is not using Debian. Exiting..."
-    exit 1
-fi
-
-if [ "$EUID" -ne 0 ]; then
-    log "ERROR: Please run as root"
-    exit 1
-fi
-
-# Parse command line arguments
-auto_install=false
-for arg in "$@"; do
-    case $arg in
-        -y|--auto)
-            auto_install=true
-            ;;
-        -h|--help)
-            echo "Usage: $0 [-y|--auto] [-h|--help]"
-            echo "  -y, --auto    Run in automatic mode (non-interactive)"
-            echo "  -h, --help    Show this help message"
-            exit 0
-            ;;
-        *)
-            log "WARNING: Unknown argument: $arg"
-            ;;
-    esac
-done
-
-function exit_prompt() {
-    if [[ "$auto_install" == "true" ]]; then
-        exit 1
+# Parse command line arguments using common library
+parse_common_args "$@" || {
+    if [[ $? -eq 2 ]]; then
+        # Help was shown, exit gracefully
+        exit 0
     fi
-    echo
-    read -p "Do you want to exit? (y/n): " EXIT
-    if [[ $EXIT =~ ^[Yy]$ ]]; then
-        exit 1
-    fi
+    exit 1
 }
 
 trap exit_prompt SIGINT
@@ -103,26 +77,8 @@ validate_ssid() {
     return 0
 }
 
-# Test internet connectivity
-test_connectivity() {
-    local attempts=0
-    local max_attempts=3
-    
-    while [[ $attempts -lt $max_attempts ]]; do
-        attempts=$((attempts + 1))
-        log "Testing connectivity (attempt $attempts/$max_attempts)..."
-        
-        if ping -q -c 2 -W 5 8.8.8.8 >/dev/null 2>&1; then
-            log "Internet connectivity confirmed"
-            return 0
-        fi
-        
-        sleep 2
-    done
-    
-    log "No internet connectivity detected"
-    return 1
-}
+# Test internet connectivity using common library function
+# (test_connectivity function replaced with check_internet from common library)
 
 reconfigure_wifi() {
     log "Starting WiFi reconfiguration..."
@@ -149,7 +105,7 @@ reconfigure_wifi() {
         nmcli device wifi rescan || true
         sleep 2
         
-        if [[ "$auto_install" != "true" ]]; then
+        if [[ "$AUTO_INSTALL" != "true" ]]; then
             echo "Available networks:"
             nmcli device wifi list | head -10
             echo
@@ -157,7 +113,7 @@ reconfigure_wifi() {
         
         # Get SSID
         local ssid
-        if [[ "$auto_install" == "true" ]]; then
+        if [[ "$AUTO_INSTALL" == "true" ]]; then
             log "ERROR: Auto mode requires pre-configured network settings"
             exit 1
         else
@@ -185,7 +141,7 @@ reconfigure_wifi() {
             log "Connection command successful, testing connectivity..."
             sleep 5
             
-            if test_connectivity; then
+            if check_internet; then
                 log "Successfully connected to WiFi network: $ssid"
                 return 0
             else
@@ -231,7 +187,7 @@ display_connections() {
 }
 
 configure_timezone() {
-    if [[ "$auto_install" == "true" ]]; then
+    if [[ "$AUTO_INSTALL" == "true" ]]; then
         log "Skipping timezone configuration in auto mode"
         return 0
     fi
@@ -270,11 +226,11 @@ main() {
     
     # Check initial connectivity
     log "Checking initial internet connection..."
-    if test_connectivity; then
+    if check_internet; then
         log "Already connected to the internet"
         display_connections
         
-        if [[ "$auto_install" != "true" ]]; then
+        if [[ "$AUTO_INSTALL" != "true" ]]; then
             read -p "You are already connected! Would you like to reconfigure the WiFi connection? (y/n): " choice
             if [[ $choice =~ ^[Yy]$ ]]; then
                 reconfigure_wifi
