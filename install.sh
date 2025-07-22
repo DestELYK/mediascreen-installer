@@ -117,6 +117,7 @@ LOCAL_ONLY=false
 USE_DEV=false
 DEBUG_MODE=false
 CUSTOM_GITHUB_URL=""
+AUTOLAUNCH=false
 
 # Check for help first, before any other processing
 for arg in "$@"; do
@@ -205,6 +206,10 @@ fi
 # Temporary directory for downloads
 tmp_dir=$(mktemp -d)
 log "Using temporary directory: $tmp_dir"
+
+# Save original working directory for local-only mode
+ORIGINAL_PWD="$PWD"
+
 cd "$tmp_dir"
 
 # System configuration directory
@@ -232,14 +237,22 @@ if [[ "$LOCAL_ONLY" == "true" ]]; then
     local_config=""
     if [[ -f "$CONFIG_DIR/menu_config.txt" ]]; then
         local_config="$CONFIG_DIR/menu_config.txt"
+        log "Using existing configuration: $local_config"
+    elif [[ -f "menu_config.txt" ]]; then
+        local_config="menu_config.txt"
+        log "Using local configuration: $local_config"
+        cp "$local_config" "$CONFIG_DIR/menu_config.txt"
+    elif [[ -f "../menu_config.txt" ]]; then
+        local_config="../menu_config.txt"
+        log "Using local configuration: $local_config"
+        cp "$local_config" "$CONFIG_DIR/menu_config.txt"
     else
         log "ERROR: Local configuration file not found. Expected locations:"
         log "  - $CONFIG_DIR/menu_config.txt"
+        log "  - ./menu_config.txt"
+        log "  - ../menu_config.txt"
         exit 1
     fi
-    
-    log "Using local configuration: $local_config"
-    cp "$local_config" "$CONFIG_DIR/menu_config.txt"
 else
     log "Downloading configuration file..."
     if command -v curl >/dev/null 2>&1; then
@@ -272,22 +285,32 @@ mkdir -p "$INSTALLER_DIR/lib"
 if [[ "$LOCAL_ONLY" == "true" ]]; then
     echo "Local-only mode: Using local common library..."
     
-    # Look for local common library
+    # Look for local common library in multiple locations
     local_common=""
-    if [[ -f "lib/common.sh" ]]; then
+    if [[ -f "$ORIGINAL_PWD/lib/common.sh" ]]; then
+        local_common="$ORIGINAL_PWD/lib/common.sh"
+    elif [[ -f "lib/common.sh" ]]; then
         local_common="lib/common.sh"
     elif [[ -f "../lib/common.sh" ]]; then
         local_common="../lib/common.sh"
+    elif [[ -f "$INSTALLER_DIR/lib/common.sh" ]]; then
+        local_common="$INSTALLER_DIR/lib/common.sh"
+        echo "Using existing common library: $local_common"
+        # Don't copy if it's already in the right place
     else
         echo "ERROR: Local common library not found. Expected locations:"
+        echo "  - $ORIGINAL_PWD/lib/common.sh"
         echo "  - ./lib/common.sh"
         echo "  - ../lib/common.sh"
+        echo "  - $INSTALLER_DIR/lib/common.sh"
         exit 1
     fi
     
-    echo "Using local common library: $local_common"
-    cp "$local_common" "$INSTALLER_DIR/lib/common.sh"
-    chmod 644 "$INSTALLER_DIR/lib/common.sh"
+    if [[ -n "$local_common" && "$local_common" != "$INSTALLER_DIR/lib/common.sh" ]]; then
+        echo "Using local common library: $local_common"
+        cp "$local_common" "$INSTALLER_DIR/lib/common.sh"
+        chmod 644 "$INSTALLER_DIR/lib/common.sh"
+    fi
 else
     echo "Downloading common library..."
     wget -q "${base_url}/lib/common.sh" -O "common.sh" || {
@@ -315,13 +338,16 @@ while IFS="" read -r line || [ -n "$line" ]; do
         
         # Look for local script file
         local_script=""
-        if [[ -f "scripts/${filename}" ]]; then
+        if [[ -f "$ORIGINAL_PWD/scripts/${filename}" ]]; then
+            local_script="$ORIGINAL_PWD/scripts/${filename}"
+        elif [[ -f "scripts/${filename}" ]]; then
             local_script="scripts/${filename}"
         elif [[ -f "../scripts/${filename}" ]]; then
             local_script="../scripts/${filename}"
         else
             echo "WARNING: Local script not found: ${filename}"
             echo "Expected locations:"
+            echo "  - $ORIGINAL_PWD/scripts/${filename}"
             echo "  - ./scripts/${filename}"
             echo "  - ../scripts/${filename}"
             
@@ -364,12 +390,15 @@ if [[ "$LOCAL_ONLY" == "true" ]]; then
     
     # Look for local ms-util.sh
     local_ms_util=""
-    if [[ -f "ms-util.sh" ]]; then
+    if [[ -f "$ORIGINAL_PWD/ms-util.sh" ]]; then
+        local_ms_util="$ORIGINAL_PWD/ms-util.sh"
+    elif [[ -f "ms-util.sh" ]]; then
         local_ms_util="ms-util.sh"
     elif [[ -f "../ms-util.sh" ]]; then
         local_ms_util="../ms-util.sh"
     else
         echo "WARNING: Local ms-util.sh not found. Expected locations:"
+        echo "  - $ORIGINAL_PWD/ms-util.sh"
         echo "  - ./ms-util.sh"
         echo "  - ../ms-util.sh"
         echo "Creating symbolic link to install.sh as fallback..."
@@ -408,10 +437,31 @@ else
 fi
 
 # Copy/move install.sh to the installer directory
-if [[ "$0" != "$INSTALLER_DIR/install.sh" ]]; then
+# Only copy if we have a valid script file (not when piped from curl/wget)
+if [[ "$0" != "$INSTALLER_DIR/install.sh" && "$0" != "bash" && "$0" != "sh" && -f "$0" ]]; then
     echo "Installing main script to $INSTALLER_DIR/install.sh"
     cp "$0" "$INSTALLER_DIR/install.sh"
     chmod +x "$INSTALLER_DIR/install.sh"
+elif [[ "$0" == "bash" || "$0" == "sh" || ! -f "$0" ]]; then
+    # Script was piped from curl/wget, download it separately
+    if [[ "$LOCAL_ONLY" != "true" ]]; then
+        echo "Installing main script to $INSTALLER_DIR/install.sh"
+        if command -v curl >/dev/null 2>&1; then
+            curl -fsSL "${base_url}/install.sh" -o "$INSTALLER_DIR/install.sh" || {
+                echo "Warning: Failed to download install.sh using curl"
+            }
+        else
+            wget -q "${base_url}/install.sh" -O "$INSTALLER_DIR/install.sh" || {
+                echo "Warning: Failed to download install.sh using wget"
+            }
+        fi
+        
+        if [[ -f "$INSTALLER_DIR/install.sh" ]]; then
+            chmod +x "$INSTALLER_DIR/install.sh"
+        fi
+    else
+        echo "Local-only mode: Cannot install main script when piped from stdin"
+    fi
 fi
 
 echo "Installation complete!"
