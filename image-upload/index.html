@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MediaScreen Watermark Upload</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: whitesmoke;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      }
+      .container {
+        background: transparent;
+        border: 2px solid black;
+        border-radius: 20px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        overflow: hidden;
+        width: 100%;
+        max-width: 500px;
+        margin: 0;
+        padding: 0;
+      }
+      .content {
+        background: white;
+        padding: 40px;
+        border-radius: 18px;
+        margin: 0;
+      }
+      .upload-area {
+        border: 3px dashed #ddd;
+        border-radius: 15px;
+        padding: 40px;
+        text-align: center;
+        transition: all 0.3s ease;
+        cursor: pointer;
+        background: #f8f9fa;
+      }
+      .upload-area:hover {
+        border-color: #333;
+        background: #f5f5f5;
+      }
+      .upload-area.dragover {
+        border-color: #333;
+        background: #f5f5f5;
+      }
+      .upload-icon {
+        font-size: 48px;
+        color: #333;
+        margin-bottom: 20px;
+      }
+      .upload-text {
+        color: #666;
+        font-size: 18px;
+        margin-bottom: 15px;
+      }
+      .upload-subtext {
+        color: #999;
+        font-size: 14px;
+        margin-bottom: 20px;
+      }
+      #fileInput {
+        display: none;
+      }
+      .btn {
+        background: #333;
+        color: white;
+        border: none;
+        padding: 12px 30px;
+        border-radius: 25px;
+        font-size: 16px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-weight: 600;
+      }
+      .btn:hover {
+        transform: translateY(-2px);
+        background: #555;
+      }
+      .progress {
+        display: none;
+        margin-top: 20px;
+      }
+      .progress-bar {
+        width: 100%;
+        height: 8px;
+        background: #f0f0f0;
+        border-radius: 4px;
+        overflow: hidden;
+      }
+      .progress-fill {
+        height: 100%;
+        background: #333;
+        width: 0%;
+        transition: width 0.3s ease;
+      }
+      .progress-text {
+        text-align: center;
+        margin-top: 10px;
+        color: #666;
+      }
+      .status {
+        margin-top: 20px;
+        padding: 15px;
+        border-radius: 10px;
+        text-align: center;
+        display: none;
+      }
+      .status.success {
+        background: #d4edda;
+        color: #155724;
+      }
+      .status.error {
+        background: #f8d7da;
+        color: #721c24;
+      }
+      .requirements {
+        background: #fff3cd;
+        border-radius: 10px;
+        padding: 15px;
+        margin-top: 20px;
+        color: #856404;
+      }
+      .requirements h4 {
+        margin-bottom: 10px;
+      }
+      .requirements ul {
+        padding-left: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="content">
+        <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+          <div class="upload-icon">📁</div>
+          <div class="upload-text">Click to select watermark image</div>
+          <div class="upload-subtext">or drag and drop your image here</div>
+          <button type="button" class="btn">Choose File</button>
+        </div>
+
+        <input type="file" id="fileInput" accept="image/*" />
+
+        <div class="progress" id="progress">
+          <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+          </div>
+          <div class="progress-text" id="progressText">Uploading...</div>
+        </div>
+
+        <div class="status" id="status"></div>
+
+        <div class="requirements">
+          <h4>Requirements:</h4>
+          <ul>
+            <li>Image formats: PNG, JPG, JPEG, GIF, BMP</li>
+            <li>Recommended size: 800x600 or smaller</li>
+            <li>File will be used as Plymouth splash watermark</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const fileInput = document.getElementById("fileInput");
+      const uploadArea = document.querySelector(".upload-area");
+      const progress = document.getElementById("progress");
+      const progressFill = document.getElementById("progressFill");
+      const progressText = document.getElementById("progressText");
+      const status = document.getElementById("status");
+
+      uploadArea.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        uploadArea.classList.add("dragover");
+      });
+
+      uploadArea.addEventListener("dragleave", () => {
+        uploadArea.classList.remove("dragover");
+      });
+
+      uploadArea.addEventListener("drop", (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove("dragover");
+        if (e.dataTransfer.files.length > 0) {
+          handleFile(e.dataTransfer.files[0]);
+        }
+      });
+
+      fileInput.addEventListener("change", (e) => {
+        if (e.target.files.length > 0) {
+          handleFile(e.target.files[0]);
+        }
+      });
+
+      function showStatus(message, type) {
+        status.textContent = message;
+        status.className = `status ${type}`;
+        status.style.display = "block";
+      }
+
+      function showProgress() {
+        progress.style.display = "block";
+      }
+
+      function updateProgress(percent) {
+        progressFill.style.width = percent + "%";
+        progressText.textContent = `Uploading... ${percent}%`;
+      }
+
+      function handleFile(file) {
+        status.style.display = "none";
+        progress.style.display = "none";
+
+        const allowedTypes = ["image/png", "image/jpeg", "image/jpg", "image/gif", "image/bmp"];
+        if (!allowedTypes.includes(file.type)) {
+          showStatus(
+            "Invalid file type. Please select a PNG, JPG, JPEG, GIF, or BMP image.",
+            "error"
+          );
+          return;
+        }
+
+        // Check file size (10MB limit)
+        if (file.size > 10 * 1024 * 1024) {
+          showStatus("File too large. Please select an image under 10MB.", "error");
+          return;
+        }
+
+        uploadFile(file);
+      }
+
+      function uploadFile(file) {
+        const formData = new FormData();
+        formData.append("file", file);
+
+        showProgress();
+        updateProgress(0);
+
+        const xhr = new XMLHttpRequest();
+
+        xhr.upload.addEventListener("progress", (e) => {
+          if (e.lengthComputable) {
+            const percent = Math.round((e.loaded / e.total) * 100);
+            updateProgress(percent);
+          }
+        });
+
+        xhr.addEventListener("load", () => {
+          progress.style.display = "none";
+          if (xhr.status === 200) {
+            showStatus(
+              "Upload completed successfully! You can now return to the terminal.",
+              "success"
+            );
+          } else {
+            try {
+              const response = JSON.parse(xhr.responseText);
+              showStatus(`Upload failed: ${response.error || "Unknown error"}`, "error");
+            } catch (e) {
+              showStatus("Upload failed. Please try again.", "error");
+            }
+          }
+        });
+
+        xhr.addEventListener("error", () => {
+          progress.style.display = "none";
+          showStatus("Upload failed due to network error. Please try again.", "error");
+        });
+
+        xhr.open("POST", "/upload");
+        xhr.send(formData);
+      }
+    </script>
+  </body>
+</html>

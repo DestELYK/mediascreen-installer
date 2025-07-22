@@ -1,7 +1,8 @@
-Configure Network,Modify Connections,configure-network.sh
-Hide Grub,Hides the grub menu from showing on boot,hide-grub.sh
-Splash Screen,Enables a splash screen when system is loading,splashscreen-setup.sh
-Firewall Setup,Enables firewall protection,firewall-setup.sh
-Auto Updates Setup,Enables automatic updates,autoupdates-setup.sh
-Browser Setup,Launches a browser on startup,browser-setup.sh
-Auto Login Setup,Allows the system to automatically boot into a user,autologin-setup.sh
+1,1,Configure Network,Modify Connections,configure-network.sh
+2,2,Auto Login Setup,Allows the system to automatically boot into a user,autologin-setup.sh
+3,3,Browser Setup,Launches a browser on startup,browser-setup.sh
+4,4,Firewall Setup,Enables firewall protection,firewall-setup.sh
+5,5,Hide Grub,Hides the grub menu from showing on boot,hide-grub.sh
+6,6,Splash Screen,Enables a splash screen when system is loading,splashscreen-setup.sh
+7,7,Auto Updates Setup,Enables automatic updates,autoupdates-setup.sh
+8,8,Reboot Setup,Configures automatic reboot scheduling,reboot-setup.sh
