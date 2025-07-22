@@ -4,28 +4,30 @@
 set -euo pipefail
 
 <<comment
-    This script installs the required scripts for the MediaScreen system.
-
-    The script downloads the configuration file and required scripts from the GitHub repository.
-    The user can choose to run a specific script or run the full installation.
+    MediaScreen Installer Script
+    
+    This script installs all MediaScreen components including scripts, configuration,
+    and the utility menu system (ms-util) to the system.
 
     This script requires root privileges. Please run as root.
 
     Command Usage:
-        - To run the full installation:
-            sudo bash install.sh --full-install
-        - To run the full installation and autolaunch with specific username:
-            sudo bash install.sh --full-install --username=<username>
-        - To run menu and select a specific script:
+        - Install all components:
             sudo bash install.sh
-        - To use local scripts without downloading (for testing):
+        - Install with development branch:
+            sudo bash install.sh --dev
+        - Install with custom repository:
+            sudo bash install.sh --github-url=https://raw.githubusercontent.com/user/repo/main
+        - Use local scripts (for testing):
             sudo bash install.sh --local-only
-        - To run full install with local scripts:
-            sudo bash install.sh --full-install --local-only --username=<username>
+        - Enable debug logging:
+            sudo bash install.sh --debug
+
+    After installation, use 'ms-util' command to access the menu system.
 
     Author: DestELYK
     Date: 07-09-2024
-    Updated: 07-21-2025 - Added improved error handling and logging
+    Updated: 07-22-2025 - Separated installation from menu system
 comment
 
 # Logging setup
@@ -105,18 +107,95 @@ validate_config() {
 }
 
 # Base URL for scripts and configuration file
-base_url="https://raw.githubusercontent.com/DestELYK/mediascreen-installer/main"
+base_repo_url="https://raw.githubusercontent.com/DestELYK/mediascreen-installer"
+branch="main"
+base_url="${base_repo_url}/${branch}"
 config_url="${base_url}/menu_config.txt"
 
-# Parse command line arguments early to check for local-only mode
+# Parse command line arguments early to check for local-only mode and other options
 LOCAL_ONLY=false
+USE_DEV=false
+DEBUG_MODE=false
+CUSTOM_GITHUB_URL=""
+
+# Check for help first, before any other processing
+for arg in "$@"; do
+    case $arg in
+        -h|--help)
+            echo "MediaScreen Installer"
+            echo
+            echo "Usage: $0 [OPTIONS]"
+            echo
+            echo "Options:"
+            echo "  --local-only          Use local scripts instead of downloading"
+            echo "  --dev                 Use development branch instead of main"
+            echo "  --debug               Enable debug logging"
+            echo "  --github-url=URL      Use custom GitHub repository URL"
+            echo "  -h, --help            Show this help message"
+            echo
+            echo "Examples:"
+            echo "  # Install all components"
+            echo "  sudo $0"
+            echo
+            echo "  # Use development branch"
+            echo "  sudo $0 --dev --debug"
+            echo
+            echo "  # Use custom repository"
+            echo "  sudo $0 --github-url=https://raw.githubusercontent.com/user/repo/main"
+            echo
+            echo "  # Local testing"
+            echo "  sudo $0 --local-only --debug"
+            echo
+            echo "Installation Structure:"
+            echo "  Scripts are installed to: /usr/local/bin/mediascreen-installer/"
+            echo "  Utility script created: /usr/local/bin/ms-util"
+            echo "  Configuration stored in: /etc/mediascreen/"
+            echo "  Logs written to: /var/log/mediascreen-installer.log"
+            echo
+            echo "After installation, use 'ms-util' to access the menu system."
+            exit 0
+            ;;
+    esac
+done
+
+# Parse other arguments
 for arg in "$@"; do
     case $arg in
         --local-only)
             LOCAL_ONLY=true
             ;;
+        --dev)
+            USE_DEV=true
+            ;;
+        --debug)
+            DEBUG_MODE=true
+            ;;
+        --github-url=*)
+            CUSTOM_GITHUB_URL="${arg#*=}"
+            ;;
+        -h|--help)
+            # Already handled above
+            ;;
+        *)
+            echo "Unknown option: $arg"
+            echo "Use --help for usage information"
+            exit 1
+            ;;
     esac
 done
+
+# Update base URL based on arguments
+if [[ -n "$CUSTOM_GITHUB_URL" ]]; then
+    base_url="$CUSTOM_GITHUB_URL"
+    log "Using custom GitHub URL: $base_url"
+elif [[ "$USE_DEV" == "true" ]]; then
+    branch="dev"
+    base_url="${base_repo_url}/${branch}"
+    log "Using development branch for downloads"
+fi
+
+# Update config URL with new base URL
+config_url="${base_url}/menu_config.txt"
 
 # Check internet connectivity before proceeding (unless local-only mode)
 if [[ "$LOCAL_ONLY" != "true" ]]; then
@@ -195,14 +274,14 @@ if [[ "$LOCAL_ONLY" == "true" ]]; then
     
     # Look for local common library
     local_common=""
-    if [[ -f "scripts/lib/common.sh" ]]; then
-        local_common="scripts/lib/common.sh"
-    elif [[ -f "../scripts/lib/common.sh" ]]; then
-        local_common="../scripts/lib/common.sh"
+    if [[ -f "lib/common.sh" ]]; then
+        local_common="lib/common.sh"
+    elif [[ -f "../lib/common.sh" ]]; then
+        local_common="../lib/common.sh"
     else
         echo "ERROR: Local common library not found. Expected locations:"
-        echo "  - ./scripts/lib/common.sh"
-        echo "  - ../scripts/lib/common.sh"
+        echo "  - ./lib/common.sh"
+        echo "  - ../lib/common.sh"
         exit 1
     fi
     
@@ -211,7 +290,7 @@ if [[ "$LOCAL_ONLY" == "true" ]]; then
     chmod 644 "$INSTALLER_DIR/lib/common.sh"
 else
     echo "Downloading common library..."
-    wget -q "${base_url}/scripts/lib/common.sh" -O "common.sh" || {
+    wget -q "${base_url}/lib/common.sh" -O "common.sh" || {
         echo "Failed to download common library. Exiting..."
         exit 1
     }
@@ -279,6 +358,55 @@ else
     echo "Finished downloading required scripts"
 fi
 
+# Install ms-util.sh utility script
+if [[ "$LOCAL_ONLY" == "true" ]]; then
+    echo "Local-only mode: Using local ms-util.sh..."
+    
+    # Look for local ms-util.sh
+    local_ms_util=""
+    if [[ -f "ms-util.sh" ]]; then
+        local_ms_util="ms-util.sh"
+    elif [[ -f "../ms-util.sh" ]]; then
+        local_ms_util="../ms-util.sh"
+    else
+        echo "WARNING: Local ms-util.sh not found. Expected locations:"
+        echo "  - ./ms-util.sh"
+        echo "  - ../ms-util.sh"
+        echo "Creating symbolic link to install.sh as fallback..."
+        ln -sf "$INSTALLER_DIR/install.sh" "/usr/local/bin/ms-util"
+        echo "Created symbolic link: /usr/local/bin/ms-util -> $INSTALLER_DIR/install.sh"
+    fi
+    
+    if [[ -n "$local_ms_util" ]]; then
+        echo "Using local ms-util: $local_ms_util"
+        cp "$local_ms_util" "$INSTALLER_DIR/ms-util.sh"
+        chmod +x "$INSTALLER_DIR/ms-util.sh"
+        ln -sf "$INSTALLER_DIR/ms-util.sh" "/usr/local/bin/ms-util"
+        echo "Created symbolic link: /usr/local/bin/ms-util -> $INSTALLER_DIR/ms-util.sh"
+    fi
+else
+    echo "Downloading ms-util.sh..."
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsSL "${base_url}/ms-util.sh" -o "$INSTALLER_DIR/ms-util.sh" || {
+            echo "Failed to download ms-util.sh using curl. Creating fallback link..."
+            ln -sf "$INSTALLER_DIR/install.sh" "/usr/local/bin/ms-util"
+            echo "Created fallback symbolic link: /usr/local/bin/ms-util -> $INSTALLER_DIR/install.sh"
+        }
+    else
+        wget -q "${base_url}/ms-util.sh" -O "$INSTALLER_DIR/ms-util.sh" || {
+            echo "Failed to download ms-util.sh using wget. Creating fallback link..."
+            ln -sf "$INSTALLER_DIR/install.sh" "/usr/local/bin/ms-util"
+            echo "Created fallback symbolic link: /usr/local/bin/ms-util -> $INSTALLER_DIR/install.sh"
+        }
+    fi
+    
+    if [[ -f "$INSTALLER_DIR/ms-util.sh" ]]; then
+        chmod +x "$INSTALLER_DIR/ms-util.sh"
+        ln -sf "$INSTALLER_DIR/ms-util.sh" "/usr/local/bin/ms-util"
+        echo "Created symbolic link: /usr/local/bin/ms-util -> $INSTALLER_DIR/ms-util.sh"
+    fi
+fi
+
 # Copy/move install.sh to the installer directory
 if [[ "$0" != "$INSTALLER_DIR/install.sh" ]]; then
     echo "Installing main script to $INSTALLER_DIR/install.sh"
@@ -286,228 +414,33 @@ if [[ "$0" != "$INSTALLER_DIR/install.sh" ]]; then
     chmod +x "$INSTALLER_DIR/install.sh"
 fi
 
-# Create symbolic link for easy access
-ln -sf "$INSTALLER_DIR/install.sh" "/usr/local/bin/ms-util"
-echo "Created symbolic link: /usr/local/bin/ms-util -> $INSTALLER_DIR/install.sh"
+echo "Installation complete!"
+echo "Use 'ms-util' command to access the MediaScreen utility menu."
 
-sleep 1
-
-full_install() {
-    echo "Running full install..."
+# Autolaunch ms-util if requested
+if [[ "$AUTOLAUNCH" == "true" ]]; then
+    echo
+    echo "Launching MediaScreen utility menu..."
+    sleep 2
     
-    # Check if username is provided as argument
-    if [ -n "$1" ]; then
-        username="$1"
-    else
-        read -p "Enter the username: " username
-    fi
-
-    # Check if user exists
-    if ! id "$username" >/dev/null 2>&1; then
-        # Create user with no password
-        useradd -m -s /bin/bash -p '*' "$username"
-        echo "User $username created with no password."
-    fi
-
-    # Prepare common arguments for all scripts
-    local common_args="-y --username='$username'"
-    
-    # Add URL if provided
-    if [ -n "$2" ]; then
-        common_args+=" --url='$2'"
-    fi
-
-    # Create array of scripts sorted by run order
-    declare -a sorted_scripts
-    declare -a sorted_orders
-    
-    # Build arrays for sorting
-    for i in "${!run_orders[@]}"; do
-        sorted_orders+=("${run_orders[$i]}:$i")
-    done
-    
-    # Sort by run order
-    IFS=$'\n' sorted_orders=($(sort -n <<< "${sorted_orders[*]}"))
-    unset IFS
-    
-    # Execute scripts in run order
-    for order_index in "${sorted_orders[@]}"; do
-        local index="${order_index#*:}"
-        local script="${script_filenames[$index]}"
-        
-        if [[ -f "$SCRIPTS_DIR/$script" ]]; then
-            echo "Running script: $script (run order: ${run_orders[$index]})"
-            
-            # Use different argument patterns for different scripts
-            case "$script" in
-                "configure-network.sh")
-                    bash "$SCRIPTS_DIR/$script" $common_args || {
-                        echo "Failed to run script: $script. Continuing with remaining scripts..."
-                        sleep 3
-                    }
-                    ;;
-                "browser-setup.sh")
-                    # Browser setup needs the URL parameter
-                    bash "$SCRIPTS_DIR/$script" $common_args || {
-                        echo "Failed to run script: $script. Exiting in 10 seconds..."
-                        sleep 10
-                        exit 1
-                    }
-                    ;;
-                *)
-                    # Run other scripts with common arguments
-                    bash "$SCRIPTS_DIR/$script" $common_args || {
-                        echo "Failed to run script: $script. Continuing with remaining scripts..."
-                        sleep 3
-                    }
-                    ;;
-            esac
-        else
-            echo "Warning: Script $script not found, skipping..."
+    # Check if ms-util was successfully installed
+    if [[ -f "/usr/local/bin/ms-util" ]]; then
+        # Pass through debug and dev options if they were used
+        local autolaunch_args=""
+        if [[ "$DEBUG_MODE" == "true" ]]; then
+            autolaunch_args+=" --debug"
         fi
-    done
-    
-    echo "Full installation completed successfully!"
-    echo "Rebooting in 5 seconds..."
-    sleep 5
-    reboot
-}
-
-# Function to display the menu
-show_menu() {
-    clear
-
-    echo "+-----------------------------------------------------------------------------------------+"
-    echo "|                                 MediaScreen Installer                               |"
-    echo "+-----------------------------------------------------------------------------------------+"
-    echo "0) Full Install"
-    
-    # Create array of menu items sorted by menu order
-    declare -a sorted_menu_items
-    
-    # Build arrays for sorting by menu order
-    for i in "${!menu_orders[@]}"; do
-        sorted_menu_items+=("${menu_orders[$i]}:$i")
-    done
-    
-    # Sort by menu order
-    IFS=$'\n' sorted_menu_items=($(sort -n <<< "${sorted_menu_items[*]}"))
-    unset IFS
-    
-    # Display menu items in menu order
-    for order_index in "${sorted_menu_items[@]}"; do
-        local index="${order_index#*:}"
-        local menu_num="${menu_orders[$index]}"
-        echo "$menu_num) ${menu_names[$index]} - ${menu_descriptions[$index]}"
-    done
-    
-    echo "==========================================================================================="
-    echo "                            u - Update | r - Reboot | q - Exit"
-    echo "==========================================================================================="
-}
-
-# Function to run a selected script
-run_option() {
-    case $1 in
-        0)
-            full_install
-            ;;
-        [1-9]*)
-            # Find the script by menu order
-            local selected_menu_order="$1"
-            local script_index=""
-            
-            # Find the index for the selected menu order
-            for i in "${!menu_orders[@]}"; do
-                if [[ "${menu_orders[$i]}" == "$selected_menu_order" ]]; then
-                    script_index="$i"
-                    break
-                fi
-            done
-            
-            if [[ -n "$script_index" ]]; then
-                local script="${script_filenames[$script_index]}"
-                local script_path="$SCRIPTS_DIR/$script"
-                
-                if [[ -f "$script_path" ]]; then
-                    echo "Running script: $script"
-                    
-                    # Interactive mode for individual scripts
-                    bash "$script_path" || {
-                        echo "Failed to run script: $script. Press Enter to continue..."
-                        read
-                    }
-                else
-                    echo "Script not found: $script"
-                    echo "Press Enter to continue..."
-                    read
-                fi
-            else
-                echo "Invalid menu option: $1"
-                echo "Press Enter to continue..."
-                read
-            fi
-            ;;
-        u|update)
-            echo "Updating..."
-            wget -q "${base_url}/install.sh" -O install.sh || {
-                echo "Download failed. Please enter the URL:"
-                read -r new_url
-                wget -q "$new_url" -O install.sh || {
-                    echo "Download failed again. Please check the URL and try again later."
-                    return 1
-                }
-            }
-            chmod +x install.sh
-            mv install.sh "$INSTALLER_DIR/install.sh"
-            ln -sf "$INSTALLER_DIR/install.sh" "/usr/local/bin/ms-util"
-            echo "Updated successfully. This script will now exit."
-            exit
-            ;;
-        r|reboot)
-            echo "Rebooting in 10 seconds..."
-            sleep 10
-            reboot
-            ;;
-        q|quit|exit)
-            echo "Exiting..."
-            exit
-            ;;
-        *)
-            echo "Invalid option. Please try again."
-            return
-            ;;
-    esac
-}
-
-FULL_INSTALL=false
-
-for arg in "$@"; do
-    case $arg in
-        --full-install)
-            FULL_INSTALL=true
-        ;;
-        --username=*)
-            USERNAME="${arg#*=}"
-        ;;
-        --url=*)
-            URL="${arg#*=}"
-        ;;
-        --local-only)
-            # Already parsed above, just acknowledge it here
-            ;;
-    esac
-done
-
-# Check for argument "--full-install"
-if [[ "$@" == *"--full-install"* ]]; then
-    full_install "$USERNAME" "$URL"
-    exit
+        if [[ "$USE_DEV" == "true" ]]; then
+            autolaunch_args+=" --dev"
+        fi
+        if [[ -n "$CUSTOM_GITHUB_URL" ]]; then
+            autolaunch_args+=" --github-url='$CUSTOM_GITHUB_URL'"
+        fi
+        
+        # Execute ms-util with arguments
+        exec /usr/local/bin/ms-util $autolaunch_args
+    else
+        echo "ERROR: ms-util was not installed properly. Cannot autolaunch."
+        exit 1
+    fi
 fi
-
-# Main loop
-while true; do
-    show_menu
-    read -p "Enter your choice: " choice
-    run_option "$choice"
-done

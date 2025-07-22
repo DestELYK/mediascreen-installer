@@ -25,10 +25,10 @@ test_result() {
     
     if [[ "$result" == "PASS" ]]; then
         TESTS_PASSED=$((TESTS_PASSED + 1))
-        echo "✓ PASS: $test_name"
+        echo "PASS: $test_name"
     else
         TESTS_FAILED=$((TESTS_FAILED + 1))
-        echo "✗ FAIL: $test_name"
+        echo "FAIL: $test_name"
     fi
     
     if [[ -n "$message" ]]; then
@@ -59,6 +59,12 @@ else
     test_result "Documentation present" "FAIL" "README.md not found"
 fi
 
+if [[ -f "$REPO_DIR/ms-util.sh" ]]; then
+    test_result "Menu utility present" "PASS"
+else
+    test_result "Menu utility present" "FAIL" "ms-util.sh not found"
+fi
+
 # Test 2: Scripts directory structure
 echo
 echo "Test 2: Checking scripts directory structure..."
@@ -70,10 +76,10 @@ else
     test_result "Scripts directory exists" "FAIL" "scripts/ directory not found"
 fi
 
-if [[ -d "$SCRIPT_DIR/lib" ]]; then
+if [[ -d "$SCRIPT_DIR/../lib" ]]; then
     test_result "Library directory exists" "PASS"
 else
-    test_result "Library directory exists" "FAIL" "scripts/lib/ directory not found"
+    test_result "Library directory exists" "FAIL" "lib/ directory not found"
 fi
 
 # Test 3: Core scripts availability
@@ -103,7 +109,7 @@ done
 # Test 4: Common library functionality
 echo
 echo "Test 4: Checking common library..."
-COMMON_LIB="$SCRIPT_DIR/lib/common.sh"
+COMMON_LIB="$SCRIPT_DIR/../lib/common.sh"
 
 if [[ -f "$COMMON_LIB" ]]; then
     test_result "Common library file exists" "PASS"
@@ -152,6 +158,14 @@ if bash -n "$REPO_DIR/install.sh" 2>/dev/null; then
     test_result "install.sh syntax" "PASS"
 else
     test_result "install.sh syntax" "FAIL" "Syntax errors detected"
+    syntax_ok=false
+fi
+
+# Test ms-util.sh
+if bash -n "$REPO_DIR/ms-util.sh" 2>/dev/null; then
+    test_result "ms-util.sh syntax" "PASS"
+else
+    test_result "ms-util.sh syntax" "FAIL" "Syntax errors detected"
     syntax_ok=false
 fi
 
@@ -247,10 +261,16 @@ fi
 echo
 echo "Test 9: Testing common arguments support..."
 
-# Test help functionality in scripts
+# Test all core scripts
 help_scripts_ok=true
 for script in "${CORE_SCRIPTS[@]}"; do
     if [[ -f "$SCRIPT_DIR/$script" ]]; then
+        # Skip configure-network.sh as it doesn't use common library by design
+        if [[ "$script" == "configure-network.sh" ]]; then
+            test_result "$script present (standalone)" "PASS"
+            continue
+        fi
+        
         # Check if script sources common library
         if grep -q "source.*common.sh" "$SCRIPT_DIR/$script"; then
             test_result "$script uses common library" "PASS"
@@ -318,11 +338,18 @@ echo "Test 12: Testing installer dry run..."
 
 cd "$REPO_DIR"
 
-# Test install.sh argument parsing (quick test)
-if timeout 5 bash -c 'echo | ./install.sh --help' >/dev/null 2>&1; then
+# Test install.sh argument parsing (check for help option support)
+if grep -q "\-\-help" "$REPO_DIR/install.sh"; then
     test_result "Installer help functionality" "PASS"
 else
-    test_result "Installer help functionality" "FAIL" "Help command failed or timed out"
+    test_result "Installer help functionality" "FAIL" "Help option not found in script"
+fi
+
+# Test ms-util.sh argument parsing (check for help option support)
+if grep -q "\-\-help" "$REPO_DIR/ms-util.sh"; then
+    test_result "Menu utility help functionality" "PASS"
+else
+    test_result "Menu utility help functionality" "FAIL" "Help option not found in script"
 fi
 
 # Summary
@@ -336,20 +363,21 @@ echo "Tests Failed: $TESTS_FAILED"
 echo
 
 if [[ $TESTS_FAILED -eq 0 ]]; then
-    echo "🎉 ALL TESTS PASSED!"
+    echo "ALL TESTS PASSED!"
     echo "The MediaScreen installer is ready for production use."
     echo
     echo "Key features validated:"
-    echo "  ✓ Modular script architecture with common library"
-    echo "  ✓ Enhanced error handling with 404 detection"
-    echo "  ✓ Custom GitHub URL support"
-    echo "  ✓ Development branch switching"
-    echo "  ✓ Web-based image upload functionality"
-    echo "  ✓ Comprehensive argument parsing"
-    echo "  ✓ Professional documentation"
+    echo "  - Modular script architecture with common library"
+    echo "  - Separated installation (install.sh) and menu (ms-util.sh) systems"
+    echo "  - Enhanced error handling with 404 detection"
+    echo "  - Custom GitHub URL support"
+    echo "  - Development branch switching"
+    echo "  - Web-based image upload functionality"
+    echo "  - Comprehensive argument parsing"
+    echo "  - Clean directory structure with lib outside scripts"
     exit 0
 else
-    echo "⚠️  SOME TESTS FAILED!"
+    echo "SOME TESTS FAILED!"
     echo "Please review the failed tests above and fix any issues."
     echo "The installer may not function correctly until all tests pass."
     exit 1

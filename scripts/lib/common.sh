@@ -11,7 +11,9 @@ set -euo pipefail
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly LOG_DIR="/var/log/mediascreen"
 readonly TEMP_DIR="/tmp/mediascreen-$$"
-GITHUB_BASE_URL="https://raw.githubusercontent.com/DestELYK/mediascreen-installer/main"
+readonly GITHUB_BASE_REPO="https://raw.githubusercontent.com/DestELYK/mediascreen-installer"
+GITHUB_BRANCH="main"
+GITHUB_BASE_URL="${GITHUB_BASE_REPO}/${GITHUB_BRANCH}"
 CUSTOM_GITHUB_URL=""
 
 # Ensure log directory exists
@@ -326,7 +328,8 @@ parse_common_args() {
         CUSTOM_GITHUB_URL="$github_url"
         log_info "Using custom GitHub URL: $github_url"
     elif [[ "$use_dev" == "true" ]]; then
-        GITHUB_BASE_URL="https://raw.githubusercontent.com/DestELYK/mediascreen-installer/dev"
+        GITHUB_BRANCH="dev"
+        GITHUB_BASE_URL="${GITHUB_BASE_REPO}/${GITHUB_BRANCH}"
         log_info "Using development branch for downloads"
     fi
     
@@ -337,6 +340,7 @@ parse_common_args() {
     export DEBUG="$debug"
     export GITHUB_BASE_URL
     export CUSTOM_GITHUB_URL
+    export GITHUB_BRANCH
 }
 
 # Interactive prompts
