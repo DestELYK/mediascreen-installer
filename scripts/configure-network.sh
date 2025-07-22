@@ -22,6 +22,15 @@ if [ "$EUID" -ne 0 ]
   exit
 fi
 
+# Check if --username is in arguments
+for arg in "$@"; do
+    case $arg in
+        -y)
+            auto_install=true
+        ;;
+    esac
+done
+
 function exit_prompt()
 {
     read -p "Do you want to exit? (y/n): " EXIT
@@ -60,15 +69,33 @@ reconfigure_wifi() {
     echo "Connected to the internet."
 }
 
+display_connections() {
+    echo "Displaying IP addresses with their interfaces..."
+    ip addr show | grep "inet " | awk '{print $NF, $2}' | grep -vP '.*(127.0.0.1|br-|docker).*'
+}
+
 # Check if connected to the internet
 echo "Checking internet connection..."
 if ping -q -c 1 -W 1 google.com >/dev/null; then
+    if [[ ! -z "$auto_install" ]]; then
+        echo "Connected to the internet."
+        display_connections
+        exit 0
+    fi
+
     read -p "You are already connected! Would you like to reconfigure the WiFi connection? (y/n): " choice
     if [[ $choice == "y" || $choice == "Y" ]]; then
         reconfigure_wifi
     fi
 else
+    echo "Not connected to the internet."
     reconfigure_wifi
+fi
+
+display_connections
+
+if [[ ! -z "$auto_install" ]]; then
+    exit 0
 fi
 
 # Reconfigure Timezone

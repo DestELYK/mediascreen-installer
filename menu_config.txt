@@ -1,4 +1,4 @@
-Wi-Fi Setup,Modify Wifi Connection,wifi-setup.sh
+Configure Network,Modify Connections,configure-network.sh
 Hide Grub,Hides the grub menu from showing on boot,hide-grub.sh
 Splash Screen,Enables a splash screen when system is loading,splashscreen-setup.sh
 Firewall Setup,Enables firewall protection,firewall-setup.sh
