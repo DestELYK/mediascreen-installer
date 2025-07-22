@@ -278,6 +278,18 @@ restart_service() {
     }
 }
 
+# Argument parsing helpers
+strip_quotes() {
+    local value="$1"
+    # Strip surrounding double quotes
+    value="${value%\"}"
+    value="${value#\"}"
+    # Strip surrounding single quotes
+    value="${value%\'}"
+    value="${value#\'}"
+    echo "$value"
+}
+
 # Argument parsing
 parse_common_args() {
     local auto_install=false
@@ -293,13 +305,13 @@ parse_common_args() {
                 auto_install=true
                 ;;
             --username=*)
-                username="${arg#*=}"
+                username="$(strip_quotes "${arg#*=}")"
                 ;;
             --url=*)
-                url="${arg#*=}"
+                url="$(strip_quotes "${arg#*=}")"
                 ;;
             --github-url=*)
-                github_url="${arg#*=}"
+                github_url="$(strip_quotes "${arg#*=}")"
                 ;;
             --debug)
                 debug=true

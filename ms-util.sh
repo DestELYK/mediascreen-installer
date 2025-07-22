@@ -205,7 +205,8 @@ done < "$CONFIG_DIR/menu_config.txt"
 
 # Full installation function
 full_install() {
-    echo "Starting full MediaScreen installation..."
+    echo "Running full install..."
+    echo
     
     # Get username with validation
     local username=""
@@ -234,6 +235,8 @@ full_install() {
             fi
         fi
     done
+
+    echo "Starting full MediaScreen installation for user: $username"
 
     # Create user using common library if available
     if [[ -f "$COMMON_LIB" ]] && command -v create_user_if_not_exists >/dev/null 2>&1; then
