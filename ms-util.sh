@@ -466,8 +466,9 @@ full_install() {
 show_menu() {
     clear
 
-    echo "                                MediaScreen Utility                                   "
-    echo "                                                                                      "
+    echo "+-----------------------------------------------------------------------------------------+"
+    echo "|                                MediaScreen Utility                                   |"
+    echo "+-----------------------------------------------------------------------------------------+"
     echo "0) Full Install"
     
     # Create array of menu items sorted by menu order
@@ -489,9 +490,9 @@ show_menu() {
         echo "$menu_num) ${menu_names[$index]} - ${menu_descriptions[$index]}"
     done
     
-    echo "                                                                                      "
+    echo "==========================================================================================="
     echo "                      u - Update | r - Reboot | b - Bash Terminal | q - Exit"
-    echo "                                                                                      "
+    echo "==========================================================================================="
 }
 
 # Function to run a selected script
