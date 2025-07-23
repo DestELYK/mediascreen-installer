@@ -67,7 +67,10 @@ if ! parse_common_args "$@"; then
             echo "  --menu-tty=TTY         TTY for menu autologin (e.g., tty2)"
             exit 0
             ;;
-        *) exit 1 ;;
+        *) 
+            # Continue execution even if common args parsing had issues
+            log_debug "parse_common_args returned non-zero, continuing anyway"
+            ;;
     esac
 fi
 

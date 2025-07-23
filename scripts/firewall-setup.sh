@@ -48,7 +48,10 @@ done
 if ! parse_common_args "$@"; then
     case $? in
         2) exit 0 ;;  # Help was shown
-        *) exit 1 ;;  # Parse error
+        *) 
+            # Continue execution even if common args parsing had issues
+            log_debug "parse_common_args returned non-zero, continuing anyway"
+            ;;
     esac
 fi
 

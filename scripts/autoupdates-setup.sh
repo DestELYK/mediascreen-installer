@@ -62,7 +62,10 @@ if ! parse_common_args "$@"; then
             echo "  --weekly-day=DAY      Set weekly reboot day (0=Sunday, 1=Monday, etc.)"
             exit 0
             ;;
-        *) exit 1 ;;
+        *) 
+            # Continue execution even if common args parsing had issues
+            log_debug "parse_common_args returned non-zero, continuing anyway"
+            ;;
     esac
 fi
 
