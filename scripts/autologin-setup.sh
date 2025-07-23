@@ -679,13 +679,9 @@ interactive_config() {
             done
         done
         
-        # Get TTY (terminal)
+        # Get TTY
         while [[ -z "$tty" ]]; do
-            echo "Available TTYs: tty1, tty2, tty3, tty4, tty5, tty6, tty7, tty8, tty9, tty10, tty11, tty12"
-            if [[ ${#BROWSER_TTY_LIST[@]} -gt 0 ]]; then
-                echo "Already assigned: ${BROWSER_TTY_LIST[*]}"
-            fi
-            read -p "Enter TTY (terminal) for $username to display browser $i on: " tty
+            read -p "Enter TTY for $username (e.g., tty1, tty3): " tty
             
             if ! validate_tty "$tty"; then
                 tty=""
@@ -722,8 +718,12 @@ interactive_config() {
         BROWSER_TTY_LIST+=("$tty")
         BROWSER_URL_LIST+=("$url")
         
-        echo "✓ Added: $username on $tty -> $url"
-        echo
+        echo "Added: $username on $tty -> $url"
+        
+        read -p "Add another browser user? (y/n): " add_another
+        if [[ ! "$add_another" =~ ^[Yy]$ ]]; then
+            add_more=false
+        fi
     done
     
     # Get menu TTY

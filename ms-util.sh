@@ -332,12 +332,112 @@ full_install() {
                     }
                     ;;
                 "autologin-setup.sh")
-                    # Autologin setup now includes browser functionality - needs the URL parameter
-                    read -p "Enter URL for browser (or press Enter for default): " browser_url
-                    if [[ -n "$browser_url" ]]; then
-                        common_args+=" --url='$browser_url'"
+                    # Autologin setup now includes browser functionality - ask for multiple browsers
+                    echo
+                    echo "=== Browser Configuration ==="
+                    
+                    # Ask how many browsers to configure
+                    local num_browsers=0
+                    while [[ $num_browsers -lt 1 || $num_browsers -gt 11 ]]; do
+                        read -p "How many browser instances would you like to configure? (1-11, tty12 reserved for menu): " num_browsers
+                        
+                        if [[ ! "$num_browsers" =~ ^[0-9]+$ ]] || [[ $num_browsers -lt 1 || $num_browsers -gt 11 ]]; then
+                            echo "Please enter a number between 1 and 11 (tty12 is reserved for menu)."
+                            num_browsers=0
+                        fi
+                    done
+                    
+                    echo "Setting up $num_browsers browser instance(s) for user: $username..."
+                    
+                    # Build browser users string
+                    local browser_users=""
+                    local current_tty=1
+                    
+                    # Configure each browser
+                    for ((i=1; i<=num_browsers; i++)); do
+                        echo
+                        echo "=== Browser $i of $num_browsers ==="
+                        
+                        local browser_tty="tty$current_tty"
+                        local browser_url=""
+                        
+                        # Skip tty12 (reserved for menu)
+                        if [[ $current_tty -eq 12 ]]; then
+                            echo "ERROR: Cannot assign more than 11 browsers (tty12 is reserved for menu)"
+                            echo "Press Enter to continue..."
+                            read
+                            return 1
+                        fi
+                        
+                        echo "User '$username' will be assigned to $browser_tty"
+                        
+                        # Get URL
+                        while [[ -z "$browser_url" ]]; do
+                            read -p "Enter URL for $username on $browser_tty (e.g., https://example.com): " browser_url
+                            
+                            if [[ -z "$browser_url" ]]; then
+                                echo "URL cannot be empty. Please try again."
+                                continue
+                            fi
+                            
+                            if [[ ! $browser_url =~ ^https?://[a-zA-Z0-9.-]+([:/][^[:space:]]*)?$ ]]; then
+                                echo "Invalid URL format. URL must start with http:// or https://"
+                                browser_url=""
+                            fi
+                        done
+                        
+                        # Add to browser users string
+                        if [[ -n "$browser_users" ]]; then
+                            browser_users+=","
+                        fi
+                        browser_users+="$username:$browser_tty:$browser_url"
+                        
+                        echo "✓ Added: $username on $browser_tty -> $browser_url"
+                        
+                        # Increment TTY for next browser
+                        current_tty=$((current_tty + 1))
+                    done
+                    
+                    # Ask for menu TTY
+                    echo
+                    echo "=== Menu Configuration ==="
+                    local menu_tty="tty12"  # Always use tty12 for menu
+                    read -p "Configure menu autologin on tty12? (y/n): " setup_menu
+                    
+                    if [[ ! "$setup_menu" =~ ^[Yy]$ ]]; then
+                        menu_tty=""  # Clear menu_tty if user doesn't want menu
                     fi
-                    bash "$SCRIPTS_DIR/$script" $common_args || {
+                    
+                    # Show configuration summary
+                    echo
+                    echo "=== Configuration Summary ==="
+                    echo "Browser autologins:"
+                    IFS=',' read -ra BROWSER_PAIRS <<< "$browser_users"
+                    for pair in "${BROWSER_PAIRS[@]}"; do
+                        IFS=':' read -ra PARTS <<< "$pair"
+                        echo "  ${PARTS[0]} -> ${PARTS[1]} -> ${PARTS[2]}"
+                    done
+                    
+                    if [[ -n "$menu_tty" ]]; then
+                        echo "Menu autologin: root -> $menu_tty"
+                    fi
+                    
+                    echo
+                    read -p "Proceed with this configuration? (y/n): " proceed
+                    if [[ ! "$proceed" =~ ^[Yy]$ ]]; then
+                        echo "Configuration cancelled."
+                        echo "Press Enter to continue..."
+                        read
+                        return
+                    fi
+                    
+                    # Build arguments for autologin-setup.sh
+                    local autologin_args="$common_args --browser-users='$browser_users'"
+                    if [[ -n "$menu_tty" ]]; then
+                        autologin_args+=" --menu-tty='$menu_tty'"
+                    fi
+                    
+                    bash "$SCRIPTS_DIR/$script" $autologin_args || {
                         echo "Failed to run script: $script. Exiting in 10 seconds..."
                         sleep 10
                         exit 1
@@ -366,9 +466,8 @@ full_install() {
 show_menu() {
     clear
 
-    echo "+-----------------------------------------------------------------------------------------+"
-    echo "|                                MediaScreen Utility                                   |"
-    echo "+-----------------------------------------------------------------------------------------+"
+    echo "                                MediaScreen Utility                                   "
+    echo "                                                                                      "
     echo "0) Full Install"
     
     # Create array of menu items sorted by menu order
@@ -390,9 +489,9 @@ show_menu() {
         echo "$menu_num) ${menu_names[$index]} - ${menu_descriptions[$index]}"
     done
     
-    echo "==========================================================================================="
+    echo "                                                                                      "
     echo "                      u - Update | r - Reboot | b - Bash Terminal | q - Exit"
-    echo "==========================================================================================="
+    echo "                                                                                      "
 }
 
 # Function to run a selected script
