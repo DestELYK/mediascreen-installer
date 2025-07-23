@@ -9,25 +9,11 @@ set -euo pipefail
 
 # Common variables
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly LOG_DIR="/var/log/mediascreen"
 readonly TEMP_DIR="/tmp/mediascreen-$$"
 readonly GITHUB_BASE_REPO="https://raw.githubusercontent.com/DestELYK/mediascreen-installer"
 GITHUB_BRANCH="main"
 GITHUB_BASE_URL="${GITHUB_BASE_REPO}/${GITHUB_BRANCH}"
 CUSTOM_GITHUB_URL=""
-
-# Ensure log directory exists
-mkdir -p "$LOG_DIR"
-
-# Setup logging
-setup_logging() {
-    local script_name="${1:-unknown}"
-    local log_file="$LOG_DIR/${script_name}.log"
-    
-    # Redirect stdout and stderr to both console and log file
-    exec 1> >(tee -a "$log_file")
-    exec 2> >(tee -a "$log_file" >&2)
-}
 
 # Logging functions
 log() {
@@ -426,13 +412,11 @@ trap cleanup_temp_files EXIT
 init_common() {
     local script_name="$1"
     
-    setup_logging "$script_name"
     setup_exit_handler
     mkdir -p "$TEMP_DIR"
     
     log_info "Starting $script_name"
     log_debug "Temporary directory: $TEMP_DIR"
-    log_debug "Log directory: $LOG_DIR"
 }
 
 # Success/failure reporting
