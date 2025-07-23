@@ -611,12 +611,10 @@ run_option() {
             reboot
             ;;
         b|bash|shell)
-            echo "Starting bash terminal..."
-            echo
-            echo "=== MediaScreen Bash Terminal ==="
-            echo "Type 'exit' to return to the menu"
-            echo
-            /bin/bash
+            echo "Opening a bash shell..."
+            echo "To return to the MediaScreen menu, type 'exit' or press Ctrl+D"
+            echo "Prompting for user login..."
+            /usr/bin/login
             ;;
         q|quit|exit)
             echo "Exiting..."
