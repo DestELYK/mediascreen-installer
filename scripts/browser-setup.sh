@@ -49,16 +49,16 @@ validate_url() {
     
     # Basic URL format validation
     if [[ ! $url =~ ^https?://[a-zA-Z0-9.-]+([:/][^[:space:]]*)?$ ]]; then
-        log_error "Invalid URL format. URL must start with http:// or https://"
+        log_error "Invalid URL format. URL must start with http:// or https://" >&2
         return 1
     fi
     
     # Test URL accessibility if we have internet
     if check_internet; then
-        log_info "Testing URL accessibility..."
+        log_info "Testing URL accessibility..." >&2
         if command -v curl >/dev/null 2>&1; then
             if ! curl -fsSL --max-time 10 --head "$url" >/dev/null 2>&1; then
-                log_warn "URL may not be accessible: $url"
+                log_warn "URL may not be accessible: $url" >&2
                 if [[ "$AUTO_INSTALL" != "true" ]]; then
                     if ! prompt_yes_no "Continue anyway?"; then
                         return 1
@@ -67,7 +67,7 @@ validate_url() {
             fi
         fi
     else
-        log_warn "Cannot test URL accessibility (no internet connection)"
+        log_warn "Cannot test URL accessibility (no internet connection)" >&2
     fi
     
     return 0
