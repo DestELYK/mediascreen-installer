@@ -363,13 +363,6 @@ main() {
         "-h"|"--help"|"help")
             show_usage
             ;;
-        "")
-            # Interactive mode
-            if ! interactive_selection; then
-                exit 1
-            fi
-            check_services_after_switch
-            ;;
         [0-9]*)
             # Direct TTY number
             if ! switch_to_terminal "$1"; then
@@ -377,9 +370,11 @@ main() {
             fi
             check_services_after_switch
             ;;
-        *)
-            # Continue execution even if common args parsing had issues
-            log_debug "parse_common_args returned non-zero, continuing anyway"
+            # Interactive mode
+            if ! interactive_selection; then
+                exit 1
+            fi
+            check_services_after_switch
             ;;
     esac
 }
