@@ -370,6 +370,7 @@ main() {
             fi
             check_services_after_switch
             ;;
+        *)
             # Interactive mode
             if ! interactive_selection; then
                 exit 1
