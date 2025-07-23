@@ -94,10 +94,12 @@ validate_config() {
     fi
     
     # Check for proper CSV format with 5 fields: menu_order,run_order,name,description,filename
+    # run_order can be numeric or contain _ for manual-only items
     while IFS="" read -r line || [ -n "$line" ]; do
-        if [[ -n "$line" && ! "$line" =~ ^[0-9]+,[0-9]+,[^,]+,[^,]+,[^,]+$ ]]; then
+        if [[ -n "$line" && ! "$line" =~ ^[0-9]+,([0-9]+|[0-9]*_[0-9]*|_),[^,]+,[^,]+,[^,]+$ ]]; then
             log "ERROR: Invalid configuration line format: $line"
             log "Expected format: menu_order,run_order,name,description,filename"
+            log "run_order can be numeric (1,2,3...) or contain _ for manual-only items (_,1_,_2,etc.)"
             return 1
         fi
     done < "$config_file"

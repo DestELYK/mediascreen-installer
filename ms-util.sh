@@ -40,6 +40,12 @@ else
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
     }
     
+    log_debug() {
+        if [[ "${DEBUG_MODE:-false}" == "true" ]]; then
+            log "DEBUG: $*"
+        fi
+    }
+    
     function exit_prompt() {
         echo
         read -p "Do you want to exit? (y/n): " EXIT
@@ -169,10 +175,12 @@ else
         fi
         
         # Check for proper CSV format with 5 fields: menu_order,run_order,name,description,filename
+        # run_order can be numeric or contain _ for manual-only items
         while IFS="" read -r line || [ -n "$line" ]; do
-            if [[ -n "$line" && ! "$line" =~ ^[0-9]+,[0-9]+,[^,]+,[^,]+,[^,]+$ ]]; then
+            if [[ -n "$line" && ! "$line" =~ ^[0-9]+,([0-9]+|[0-9]*_[0-9]*|_),[^,]+,[^,]+,[^,]+$ ]]; then
                 log "ERROR: Invalid configuration line format: $line"
                 log "Expected format: menu_order,run_order,name,description,filename"
+                log "run_order can be numeric (1,2,3...) or contain _ for manual-only items (_,1_,_2,etc.)"
                 return 1
             fi
         done < "$config_file"
@@ -281,13 +289,26 @@ full_install() {
         common_args+=" --github-url='$CUSTOM_GITHUB_URL'"
     fi
 
-    # Create array of scripts sorted by run order
+    # Create array of scripts sorted by run order, excluding items marked with _
     declare -a sorted_scripts
     declare -a sorted_orders
     
-    # Build arrays for sorting
+    # Build arrays for sorting, skip items with _ in run_order
     for i in "${!run_orders[@]}"; do
-        sorted_orders+=("${run_orders[$i]}:$i")
+        local run_order="${run_orders[$i]}"
+        
+        # Skip items with _ in run_order (manual only items)
+        if [[ "$run_order" == *"_"* ]]; then
+            log_debug "Skipping script in auto install (marked with _): ${script_filenames[$i]}"
+            continue
+        fi
+        
+        # Validate run_order is numeric
+        if [[ "$run_order" =~ ^[0-9]+$ ]]; then
+            sorted_orders+=("${run_orders[$i]}:$i")
+        else
+            log_debug "Skipping script with non-numeric run_order: ${script_filenames[$i]} (run_order: $run_order)"
+        fi
     done
     
     # Sort by run order
@@ -380,7 +401,7 @@ run_option() {
         0)
             full_install
             ;;
-        [1-9]*)
+        [0-9]*)
             # Find the script by menu order
             local selected_menu_order="$1"
             local script_index=""
