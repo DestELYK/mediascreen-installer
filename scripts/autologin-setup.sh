@@ -636,36 +636,56 @@ interactive_config() {
     declare -ga BROWSER_TTY_LIST
     declare -ga BROWSER_URL_LIST
     
-    echo "Configure browser autologins:"
+    # Ask how many browsers to configure
+    local num_browsers=0
+    while [[ $num_browsers -lt 1 || $num_browsers -gt 10 ]]; do
+        read -p "How many browser instances would you like to configure? (1-10): " num_browsers
+        
+        if [[ ! "$num_browsers" =~ ^[0-9]+$ ]] || [[ $num_browsers -lt 1 || $num_browsers -gt 10 ]]; then
+            echo "Please enter a number between 1 and 10."
+            num_browsers=0
+        fi
+    done
     
-    local add_more=true
-    while [[ "$add_more" == "true" ]]; do
+    echo
+    echo "Setting up $num_browsers browser instance(s)..."
+    echo
+    
+    # Configure each browser
+    for ((i=1; i<=num_browsers; i++)); do
+        echo "=== Browser $i of $num_browsers ==="
+        
         local username=""
         local tty=""
         local url=""
         
         # Get username
         while [[ -z "$username" ]]; do
-            read -p "Enter browser username (or 'done' to finish): " username
-            
-            if [[ "$username" == "done" ]]; then
-                add_more=false
-                break
-            fi
+            read -p "Enter username for browser $i: " username
             
             if ! validate_username "$username"; then
                 username=""
                 echo "Please try again with a valid username."
+                continue
             fi
+            
+            # Check if username is already used
+            for existing_user in "${BROWSER_USER_LIST[@]}"; do
+                if [[ "$existing_user" == "$username" ]]; then
+                    echo "Username '$username' is already used. Please choose another."
+                    username=""
+                    break
+                fi
+            done
         done
         
-        if [[ "$add_more" == "false" ]]; then
-            break
-        fi
-        
-        # Get TTY
+        # Get TTY (terminal)
         while [[ -z "$tty" ]]; do
-            read -p "Enter TTY for $username (e.g., tty1, tty3): " tty
+            echo "Available TTYs: tty1, tty2, tty3, tty4, tty5, tty6, tty7, tty8, tty9, tty10, tty11, tty12"
+            if [[ ${#BROWSER_TTY_LIST[@]} -gt 0 ]]; then
+                echo "Already assigned: ${BROWSER_TTY_LIST[*]}"
+            fi
+            read -p "Enter TTY (terminal) for $username to display browser $i on: " tty
             
             if ! validate_tty "$tty"; then
                 tty=""
@@ -702,12 +722,8 @@ interactive_config() {
         BROWSER_TTY_LIST+=("$tty")
         BROWSER_URL_LIST+=("$url")
         
-        echo "Added: $username on $tty -> $url"
-        
-        read -p "Add another browser user? (y/n): " add_another
-        if [[ ! "$add_another" =~ ^[Yy]$ ]]; then
-            add_more=false
-        fi
+        echo "✓ Added: $username on $tty -> $url"
+        echo
     done
     
     # Get menu TTY
