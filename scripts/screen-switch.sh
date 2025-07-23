@@ -378,10 +378,8 @@ main() {
             check_services_after_switch
             ;;
         *)
-            log_error "Unknown option: $1"
-            echo
-            show_usage
-            exit 1
+            # Continue execution even if common args parsing had issues
+            log_debug "parse_common_args returned non-zero, continuing anyway"
             ;;
     esac
 }
