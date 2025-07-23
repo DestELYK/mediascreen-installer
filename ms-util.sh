@@ -331,8 +331,8 @@ full_install() {
                         sleep 3
                     }
                     ;;
-                "browser-setup.sh")
-                    # Browser setup needs the URL parameter
+                "autologin-setup.sh")
+                    # Autologin setup now includes browser functionality - needs the URL parameter
                     read -p "Enter URL for browser (or press Enter for default): " browser_url
                     if [[ -n "$browser_url" ]]; then
                         common_args+=" --url='$browser_url'"
@@ -391,7 +391,7 @@ show_menu() {
     done
     
     echo "==========================================================================================="
-    echo "                            u - Update | r - Reboot | q - Exit"
+    echo "                      u - Update | r - Reboot | b - Bash Terminal | q - Exit"
     echo "==========================================================================================="
 }
 
@@ -494,6 +494,14 @@ run_option() {
             echo "Rebooting in 10 seconds..."
             sleep 10
             reboot
+            ;;
+        b|bash|shell)
+            echo "Starting bash terminal..."
+            echo
+            echo "=== MediaScreen Bash Terminal ==="
+            echo "Type 'exit' to return to the menu"
+            echo
+            /bin/bash
             ;;
         q|quit|exit)
             echo "Exiting..."
