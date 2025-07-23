@@ -587,8 +587,23 @@ run_option() {
             fi
             
             echo "Update completed successfully!"
-            echo "Press Enter to continue..."
-            read
+            echo "Relaunching ms-util with updated components..."
+            sleep 2
+            
+            # Build relaunch arguments to preserve current settings
+            local relaunch_args=""
+            if [[ "$DEBUG_MODE" == "true" ]]; then
+                relaunch_args+=" --debug"
+            fi
+            if [[ "$USE_DEV" == "true" ]]; then
+                relaunch_args+=" --dev"
+            fi
+            if [[ -n "$CUSTOM_GITHUB_URL" ]]; then
+                relaunch_args+=" --github-url='$CUSTOM_GITHUB_URL'"
+            fi
+            
+            # Relaunch ms-util with updated components
+            exec /usr/local/bin/ms-util $relaunch_args
             ;;
         r|reboot)
             echo "Rebooting in 10 seconds..."
