@@ -25,37 +25,15 @@ INSTALLER_DIR="/usr/local/bin/mediascreen-installer"
 SCRIPTS_DIR="$INSTALLER_DIR/scripts"
 COMMON_LIB="$INSTALLER_DIR/lib/common.sh"
 
-# Load common library if available
+# Load common library - required for operation
 if [[ -f "$COMMON_LIB" ]]; then
     source "$COMMON_LIB"
     init_common "ms-util"
 else
-    # Fallback logging if common library not available
-    LOG_FILE="/var/log/mediascreen-util.log"
-    mkdir -p "$(dirname "$LOG_FILE")"
-    exec 1> >(tee -a "$LOG_FILE")
-    exec 2> >(tee -a "$LOG_FILE" >&2)
-    
-    log() {
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
-    }
-    
-    log_debug() {
-        if [[ "${DEBUG_MODE:-false}" == "true" ]]; then
-            log "DEBUG: $*"
-        fi
-    }
-    
-    function exit_prompt() {
-        echo
-        read -p "Do you want to exit? (y/n): " EXIT
-        if [[ $EXIT =~ ^[Yy]$ ]]; then
-            log "Exiting at user request"
-            exit 130
-        fi
-    }
-    
-    trap exit_prompt SIGINT
+    echo "ERROR: Common library not found at $COMMON_LIB"
+    echo "Please ensure MediaScreen installer components are properly installed."
+    echo "Run 'sudo install.sh' first to install the components."
+    exit 1
 fi
 
 # Parse command line arguments
@@ -63,83 +41,161 @@ LOCAL_ONLY=false
 USE_DEV=false
 DEBUG_MODE=false
 CUSTOM_GITHUB_URL=""
+FULL_INSTALL=false
+AUTO_BROWSER_USERS=""
+AUTO_MENU_TTY=""
 
-# Check if common library is available and use its argument parsing
-if [[ -f "$COMMON_LIB" ]]; then
-    # Use common library argument parsing
-    parse_common_args "$@" || {
-        if [[ $? -eq 2 ]]; then
-            # Help was shown, exit gracefully
-            exit 0
-        fi
+# Parse common arguments using common library
+parse_common_args "$@" || {
+    if [[ $? -eq 2 ]]; then
+        # Help was shown, exit gracefully
+        echo
+        echo "MediaScreen Utility additional options:"
+        echo "  --full-install        Run automatic full installation (non-interactive)"
+        echo "  --browser-users=LIST  Browser users configuration (user:tty:url,user:tty:url,...)"
+        echo "  --menu-tty=TTY        TTY for menu autologin (default: tty12)"
+        echo
+        echo "Examples:"
+        echo "  # Automatic full installation with single browser"
+        echo "  sudo $0 --full-install --browser-users='mediauser:tty1:https://example.com'"
+        echo
+        echo "  # Multiple browser configuration"
+        echo "  sudo $0 --full-install --browser-users='user:tty1:https://site1.com,user:tty2:https://site2.com'"
+        echo
+        echo "Features:"
+        echo "  - Interactive menu for running individual scripts"
+        echo "  - Full installation option"
+        echo "  - Automatic non-interactive installation"
+        echo "  - Script update functionality"
+        echo "  - System reboot option"
+        echo
+        echo "Note: Run 'sudo install.sh' first to install the MediaScreen components."
+        exit 0
+    fi
+    exit 1
+}
+
+# Get values from common library exports
+DEBUG_MODE="${DEBUG:-false}"
+
+# Set local variables from exports if they exist
+if [[ -n "${GITHUB_BRANCH:-}" && "$GITHUB_BRANCH" == "dev" ]]; then
+    USE_DEV=true
+fi
+
+if [[ -n "${CUSTOM_GITHUB_URL:-}" ]]; then
+    CUSTOM_GITHUB_URL="$CUSTOM_GITHUB_URL"
+fi
+
+# Parse additional arguments specific to ms-util
+for arg in "$@"; do
+    case $arg in
+        --full-install)
+            FULL_INSTALL=true
+            ;;
+        --browser-users=*)
+            AUTO_BROWSER_USERS="${arg#*=}"
+            ;;
+        --menu-tty=*)
+            AUTO_MENU_TTY="${arg#*=}"
+            ;;
+        *)
+            # Common library handles other args
+            ;;
+    esac
+done
+
+# Validate full install mode arguments
+if [[ "$FULL_INSTALL" == "true" ]]; then
+    # Validate required browser-users
+    if [[ -z "$AUTO_BROWSER_USERS" ]]; then
+        echo "ERROR: --browser-users is required when using --full-install"
+        echo "Format: user:tty:url,user:tty:url,..."
+        echo "Example: --browser-users='mediauser:tty1:https://example.com,mediauser:tty2:https://site2.com'"
+        echo "Use --help for usage information"
         exit 1
-    }
-    
-    # Get values from common library exports
-    DEBUG_MODE="${DEBUG:-false}"
-    
-    # Set local variables from exports if they exist
-    if [[ -n "${GITHUB_BRANCH:-}" && "$GITHUB_BRANCH" == "dev" ]]; then
-        USE_DEV=true
     fi
     
-    if [[ -n "${CUSTOM_GITHUB_URL:-}" ]]; then
-        CUSTOM_GITHUB_URL="$CUSTOM_GITHUB_URL"
+    # Extract username from first browser configuration and validate format
+    local first_user
+    IFS=',' read -ra BROWSER_PAIRS <<< "$AUTO_BROWSER_USERS"
+    IFS=':' read -ra FIRST_PARTS <<< "${BROWSER_PAIRS[0]}"
+    first_user="${FIRST_PARTS[0]}"
+    
+    if [[ -z "$first_user" ]]; then
+        echo "ERROR: Invalid browser-users format. Cannot extract username."
+        echo "Expected format: user:tty:url,user:tty:url,..."
+        exit 1
     fi
-else
-    # Fallback argument parsing if common library not available
-    for arg in "$@"; do
-        case $arg in
-            -h|--help)
-                echo "MediaScreen Utility (ms-util)"
-                echo
-                echo "Usage: $0 [OPTIONS]"
-                echo
-                echo "Options:"
-                echo "  --local-only          Use local scripts instead of downloading"
-                echo "  --dev                 Use development branch instead of main"
-                echo "  --debug               Enable debug logging"
-                echo "  --github-url=URL      Use custom GitHub repository URL"
-                echo "  -h, --help            Show this help message"
-                echo
-                echo "Examples:"
-                echo "  # Interactive menu"
-                echo "  sudo $0"
-                echo
-                echo "  # Use development branch"
-                echo "  sudo $0 --dev --debug"
-                echo
-                echo "  # Use custom repository"
-                echo "  sudo $0 --github-url=https://raw.githubusercontent.com/user/repo/main"
-                echo
-                echo "Features:"
-                echo "  - Interactive menu for running individual scripts"
-                echo "  - Full installation option"
-                echo "  - Script update functionality"
-                echo "  - System reboot option"
-                echo
-                echo "Note: Run 'sudo install.sh' first to install the MediaScreen components."
-                exit 0
-                ;;
-            --local-only)
-                LOCAL_ONLY=true
-                ;;
-            --dev)
-                USE_DEV=true
-                ;;
-            --debug)
-                DEBUG_MODE=true
-                ;;
-            --github-url=*)
-                CUSTOM_GITHUB_URL="${arg#*=}"
-                ;;
-            *)
-                echo "Unknown option: $arg"
-                echo "Use --help for usage information"
-                exit 1
-                ;;
-        esac
+    
+    # Validate username format
+    if [[ ! $first_user =~ ^[a-zA-Z0-9_][a-zA-Z0-9_-]*$ ]]; then
+        echo "ERROR: Invalid username format in browser-users. Use only alphanumeric characters, underscores, and hyphens."
+        exit 1
+    fi
+    
+    if [[ ${#first_user} -gt 32 ]]; then
+        echo "ERROR: Username too long. Maximum 32 characters allowed."
+        exit 1
+    fi
+    
+    # Validate browser-users format and count browsers
+    local browser_count=0
+    for pair in "${BROWSER_PAIRS[@]}"; do
+        IFS=':' read -ra PARTS <<< "$pair"
+        if [[ ${#PARTS[@]} -ne 3 ]]; then
+            echo "ERROR: Invalid browser-users format: $pair"
+            echo "Expected format: user:tty:url"
+            exit 1
+        fi
+        
+        local user="${PARTS[0]}"
+        local tty="${PARTS[1]}"
+        local url="${PARTS[2]}"
+        
+        # Validate TTY format
+        if [[ ! $tty =~ ^tty[0-9]+$ ]]; then
+            echo "ERROR: Invalid TTY format: $tty (expected format: tty1, tty2, etc.)"
+            exit 1
+        fi
+        
+        # Validate URL format
+        if [[ ! $url =~ ^https?://[a-zA-Z0-9.-]+([:/][^[:space:]]*)?$ ]]; then
+            echo "ERROR: Invalid URL format: $url (must start with http:// or https://)"
+            exit 1
+        fi
+        
+        # Check if TTY is tty12 (reserved for menu)
+        if [[ "$tty" == "tty12" ]]; then
+            echo "ERROR: tty12 is reserved for menu. Use tty1-tty11 for browsers."
+            exit 1
+        fi
+        
+        browser_count=$((browser_count + 1))
     done
+    
+    if [[ $browser_count -gt 11 ]]; then
+        echo "ERROR: Too many browsers configured ($browser_count). Maximum 11 browsers allowed (tty12 is reserved for menu)."
+        exit 1
+    fi
+    
+    # Set default menu TTY if not provided
+    if [[ -z "$AUTO_MENU_TTY" ]]; then
+        AUTO_MENU_TTY="tty12"
+    fi
+    
+    echo "INFO: Full install configuration:"
+    echo "  Username: $first_user"
+    echo "  Browser configurations ($browser_count):"
+    for pair in "${BROWSER_PAIRS[@]}"; do
+        IFS=':' read -ra PARTS <<< "$pair"
+        echo "    ${PARTS[0]} -> ${PARTS[1]} -> ${PARTS[2]}"
+    done
+    echo "  Menu: root -> $AUTO_MENU_TTY"
+    echo
+    
+    log "Full install mode enabled with browser configurations: $AUTO_BROWSER_USERS"
+    log "Menu TTY: $AUTO_MENU_TTY"
 fi
 
 # Check if MediaScreen is installed
@@ -153,44 +209,8 @@ if [[ ! -f "$CONFIG_DIR/menu_config.txt" ]] || [[ ! -d "$SCRIPTS_DIR" ]]; then
     exit 1
 fi
 
-# Validate configuration file - use common library function if available
-if [[ -f "$COMMON_LIB" ]] && command -v validate_config >/dev/null 2>&1; then
-    # Use common library validation
-    validate_config "$CONFIG_DIR/menu_config.txt" || exit 1
-else
-    # Fallback validation function
-    validate_config() {
-        local config_file="$1"
-        local line_count
-        
-        if [[ ! -f "$config_file" ]]; then
-            log "ERROR: Configuration file not found: $config_file"
-            return 1
-        fi
-        
-        line_count=$(wc -l < "$config_file")
-        if [[ $line_count -eq 0 ]]; then
-            log "ERROR: Configuration file is empty"
-            return 1
-        fi
-        
-        # Check for proper CSV format with 5 fields: menu_order,run_order,name,description,filename
-        # run_order can be numeric or contain _ for manual-only items
-        while IFS="" read -r line || [ -n "$line" ]; do
-            if [[ -n "$line" && ! "$line" =~ ^[0-9]+,([0-9]+|[0-9]*_[0-9]*|_),[^,]+,[^,]+,[^,]+$ ]]; then
-                log "ERROR: Invalid configuration line format: $line"
-                log "Expected format: menu_order,run_order,name,description,filename"
-                log "run_order can be numeric (1,2,3...) or contain _ for manual-only items (_,1_,_2,etc.)"
-                return 1
-            fi
-        done < "$config_file"
-        
-        log "Configuration file validated successfully ($line_count entries)"
-        return 0
-    }
-    
-    validate_config "$CONFIG_DIR/menu_config.txt" || exit 1
-fi
+# Validate configuration file using common library
+validate_config "$CONFIG_DIR/menu_config.txt" || exit 1
 
 # Read the configuration file and generate menu options
 declare -a menu_orders
@@ -211,63 +231,161 @@ while IFS="" read -r line || [ -n "$line" ]; do
     script_filenames+=("$filename")
 done < "$CONFIG_DIR/menu_config.txt"
 
-# Full installation function
+# Full installation function (supports both interactive and automatic modes)
 full_install() {
-    echo "Running full install..."
-    echo
-    
-    # Get username with validation
+    local auto_mode="${1:-false}"
     local username=""
-    while [[ -z "$username" ]]; do
-        read -p "Enter the username for MediaScreen: " username
+    local browser_users=""
+    local menu_tty=""
+    
+    if [[ "$auto_mode" == "true" ]]; then
+        echo "Running automatic full install..."
         
-        # Validate username using common library if available
-        if [[ -f "$COMMON_LIB" ]] && command -v validate_username >/dev/null 2>&1; then
+        # Use the predefined browser configuration
+        browser_users="$AUTO_BROWSER_USERS"
+        menu_tty="$AUTO_MENU_TTY"
+        
+        # Extract username from browser configuration using common library
+        declare -A parsed_browsers
+        declare -a unique_usernames
+        
+        if parse_browser_users "$browser_users" parsed_browsers unique_usernames; then
+            username="${unique_usernames[0]}"
+            echo "Username: $username"
+            echo "Browser configuration: $browser_users"
+            echo "Menu TTY: $menu_tty"
+            echo
+        else
+            echo "ERROR: Failed to parse browser configuration"
+            exit 1
+        fi
+    else
+        echo "Running interactive full install..."
+        echo
+        
+        # Get username with validation
+        while [[ -z "$username" ]]; do
+            read -p "Enter the username for MediaScreen: " username
+            
+            # Validate username using common library
             if ! validate_username "$username"; then
                 username=""
                 echo "Please try again with a valid username."
                 continue
             fi
-        else
-            # Fallback validation
-            if [[ ! $username =~ ^[a-zA-Z0-9_][a-zA-Z0-9_-]*$ ]]; then
-                echo "ERROR: Invalid username format. Use only alphanumeric characters, underscores, and hyphens."
-                username=""
-                continue
-            fi
+        done
+
+        echo "Starting full MediaScreen installation for user: $username"
+
+        # Interactive browser configuration
+        echo
+        echo "=== Browser Configuration ==="
+        
+        # Ask how many browsers to configure
+        local num_browsers=0
+        while [[ $num_browsers -lt 1 || $num_browsers -gt 11 ]]; do
+            read -p "How many browser instances would you like to configure? (1-11, tty12 reserved for menu): " num_browsers
             
-            if [[ ${#username} -gt 32 ]]; then
-                echo "ERROR: Username too long. Maximum 32 characters allowed."
-                username=""
-                continue
+            if [[ ! "$num_browsers" =~ ^[0-9]+$ ]] || [[ $num_browsers -lt 1 || $num_browsers -gt 11 ]]; then
+                echo "Please enter a number between 1 and 11 (tty12 is reserved for menu)."
+                num_browsers=0
             fi
-        fi
-    done
-
-    echo "Starting full MediaScreen installation for user: $username"
-
-    # Create user using common library if available
-    if [[ -f "$COMMON_LIB" ]] && command -v create_user_if_not_exists >/dev/null 2>&1; then
-        if ! create_user_if_not_exists "$username"; then
-            echo "ERROR: Failed to create user: '$username'"
-            echo "Press Enter to continue..."
-            read
-            return 1
-        fi
-    else
-        # Fallback user creation
-        if ! id "$username" >/dev/null 2>&1; then
-            echo "Creating user: $username"
-            if useradd -m -s /bin/bash -p '*' "$username"; then
-                echo "User $username created successfully."
-            else
-                echo "ERROR: Failed to create user: '$username'"
+        done
+        
+        echo "Setting up $num_browsers browser instance(s) for user: $username..."
+        
+        # Build browser users string
+        browser_users=""
+        local current_tty=1
+        
+        # Configure each browser
+        for ((i=1; i<=num_browsers; i++)); do
+            echo
+            echo "=== Browser $i of $num_browsers ==="
+            
+            local browser_tty="tty$current_tty"
+            local browser_url=""
+            
+            # Skip tty12 (reserved for menu)
+            if [[ $current_tty -eq 12 ]]; then
+                echo "ERROR: Cannot assign more than 11 browsers (tty12 is reserved for menu)"
                 echo "Press Enter to continue..."
                 read
                 return 1
             fi
+            
+            echo "User '$username' will be assigned to $browser_tty"
+            
+            # Get URL
+            while [[ -z "$browser_url" ]]; do
+                read -p "Enter URL for $username on $browser_tty (e.g., https://example.com): " browser_url
+                
+                if [[ -z "$browser_url" ]]; then
+                    echo "URL cannot be empty. Please try again."
+                    continue
+                fi
+                
+                if [[ ! $browser_url =~ ^https?://[a-zA-Z0-9.-]+([:/][^[:space:]]*)?$ ]]; then
+                    echo "Invalid URL format. URL must start with http:// or https://"
+                    browser_url=""
+                fi
+            done
+            
+            # Add to browser users string
+            if [[ -n "$browser_users" ]]; then
+                browser_users+=","
+            fi
+            browser_users+="$username:$browser_tty:$browser_url"
+            
+            echo "✓ Added: $username on $browser_tty -> $browser_url"
+            
+            # Increment TTY for next browser
+            current_tty=$((current_tty + 1))
+        done
+        
+        # Ask for menu TTY
+        echo
+        echo "=== Menu Configuration ==="
+        menu_tty="tty12"  # Always use tty12 for menu
+        read -p "Configure menu autologin on tty12? (y/n): " setup_menu
+        
+        if [[ ! "$setup_menu" =~ ^[Yy]$ ]]; then
+            menu_tty=""  # Clear menu_tty if user doesn't want menu
+        fi
+        
+        # Show configuration summary
+        echo
+        echo "=== Configuration Summary ==="
+        echo "Browser autologins:"
+        IFS=',' read -ra BROWSER_PAIRS <<< "$browser_users"
+        for pair in "${BROWSER_PAIRS[@]}"; do
+            IFS=':' read -ra PARTS <<< "$pair"
+            echo "  ${PARTS[0]} -> ${PARTS[1]} -> ${PARTS[2]}"
+        done
+        
+        if [[ -n "$menu_tty" ]]; then
+            echo "Menu autologin: root -> $menu_tty"
+        fi
+        
+        echo
+        read -p "Proceed with this configuration? (y/n): " proceed
+        if [[ ! "$proceed" =~ ^[Yy]$ ]]; then
+            echo "Configuration cancelled."
+            echo "Press Enter to continue..."
+            read
+            return
+        fi
+    fi
+
+    # Create user using common library
+    if ! create_user_if_not_exists "$username"; then
+        echo "ERROR: Failed to create user: '$username'"
+        if [[ "$auto_mode" == "true" ]]; then
+            exit 1
         else
-            echo "User $username already exists."
+            echo "Press Enter to continue..."
+            read
+            return 1
         fi
     fi
 
@@ -332,103 +450,9 @@ full_install() {
                     }
                     ;;
                 "autologin-setup.sh")
-                    # Autologin setup now includes browser functionality - ask for multiple browsers
-                    echo
-                    echo "=== Browser Configuration ==="
-                    
-                    # Ask how many browsers to configure
-                    local num_browsers=0
-                    while [[ $num_browsers -lt 1 || $num_browsers -gt 11 ]]; do
-                        read -p "How many browser instances would you like to configure? (1-11, tty12 reserved for menu): " num_browsers
-                        
-                        if [[ ! "$num_browsers" =~ ^[0-9]+$ ]] || [[ $num_browsers -lt 1 || $num_browsers -gt 11 ]]; then
-                            echo "Please enter a number between 1 and 11 (tty12 is reserved for menu)."
-                            num_browsers=0
-                        fi
-                    done
-                    
-                    echo "Setting up $num_browsers browser instance(s) for user: $username..."
-                    
-                    # Build browser users string
-                    local browser_users=""
-                    local current_tty=1
-                    
-                    # Configure each browser
-                    for ((i=1; i<=num_browsers; i++)); do
-                        echo
-                        echo "=== Browser $i of $num_browsers ==="
-                        
-                        local browser_tty="tty$current_tty"
-                        local browser_url=""
-                        
-                        # Skip tty12 (reserved for menu)
-                        if [[ $current_tty -eq 12 ]]; then
-                            echo "ERROR: Cannot assign more than 11 browsers (tty12 is reserved for menu)"
-                            echo "Press Enter to continue..."
-                            read
-                            return 1
-                        fi
-                        
-                        echo "User '$username' will be assigned to $browser_tty"
-                        
-                        # Get URL
-                        while [[ -z "$browser_url" ]]; do
-                            read -p "Enter URL for $username on $browser_tty (e.g., https://example.com): " browser_url
-                            
-                            if [[ -z "$browser_url" ]]; then
-                                echo "URL cannot be empty. Please try again."
-                                continue
-                            fi
-                            
-                            if [[ ! $browser_url =~ ^https?://[a-zA-Z0-9.-]+([:/][^[:space:]]*)?$ ]]; then
-                                echo "Invalid URL format. URL must start with http:// or https://"
-                                browser_url=""
-                            fi
-                        done
-                        
-                        # Add to browser users string
-                        if [[ -n "$browser_users" ]]; then
-                            browser_users+=","
-                        fi
-                        browser_users+="$username:$browser_tty:$browser_url"
-                        
-                        echo "✓ Added: $username on $browser_tty -> $browser_url"
-                        
-                        # Increment TTY for next browser
-                        current_tty=$((current_tty + 1))
-                    done
-                    
-                    # Ask for menu TTY
-                    echo
-                    echo "=== Menu Configuration ==="
-                    local menu_tty="tty12"  # Always use tty12 for menu
-                    read -p "Configure menu autologin on tty12? (y/n): " setup_menu
-                    
-                    if [[ ! "$setup_menu" =~ ^[Yy]$ ]]; then
-                        menu_tty=""  # Clear menu_tty if user doesn't want menu
-                    fi
-                    
-                    # Show configuration summary
-                    echo
-                    echo "=== Configuration Summary ==="
-                    echo "Browser autologins:"
-                    IFS=',' read -ra BROWSER_PAIRS <<< "$browser_users"
-                    for pair in "${BROWSER_PAIRS[@]}"; do
-                        IFS=':' read -ra PARTS <<< "$pair"
-                        echo "  ${PARTS[0]} -> ${PARTS[1]} -> ${PARTS[2]}"
-                    done
-                    
-                    if [[ -n "$menu_tty" ]]; then
-                        echo "Menu autologin: root -> $menu_tty"
-                    fi
-                    
-                    echo
-                    read -p "Proceed with this configuration? (y/n): " proceed
-                    if [[ ! "$proceed" =~ ^[Yy]$ ]]; then
-                        echo "Configuration cancelled."
-                        echo "Press Enter to continue..."
-                        read
-                        return
+                    if [[ "$auto_mode" == "true" ]]; then
+                        # Automatic autologin setup with predefined browser configuration
+                        echo "Setting up autologin with predefined configuration..."
                     fi
                     
                     # Build arguments for autologin-setup.sh
@@ -438,9 +462,15 @@ full_install() {
                     fi
                     
                     bash "$SCRIPTS_DIR/$script" $autologin_args || {
-                        echo "Failed to run script: $script. Exiting in 10 seconds..."
-                        sleep 10
-                        exit 1
+                        echo "Failed to run script: $script."
+                        if [[ "$auto_mode" == "true" ]]; then
+                            echo "Exiting..."
+                            exit 1
+                        else
+                            echo "Exiting in 10 seconds..."
+                            sleep 10
+                            exit 1
+                        fi
                     }
                     ;;
                 *)
@@ -466,9 +496,9 @@ full_install() {
 show_menu() {
     clear
 
-    echo "+-----------------------------------------------------------------------------------------+"
+    echo "+--------------------------------------------------------------------------------------+"
     echo "|                                MediaScreen Utility                                   |"
-    echo "+-----------------------------------------------------------------------------------------+"
+    echo "+--------------------------------------------------------------------------------------+"
     echo "0) Full Install"
     
     # Create array of menu items sorted by menu order
@@ -499,7 +529,7 @@ show_menu() {
 run_option() {
     case $1 in
         0)
-            full_install
+            full_install false
             ;;
         [0-9]*)
             # Find the script by menu order
@@ -611,6 +641,7 @@ run_option() {
             reboot
             ;;
         b|bash|shell)
+            clear
             echo "Opening a bash shell..."
             echo "To return to the MediaScreen menu, type 'exit' or press Ctrl+D"
             echo "Prompting for user login..."
@@ -627,9 +658,15 @@ run_option() {
     esac
 }
 
-# Main loop
-while true; do
-    show_menu
-    read -p "Enter your choice: " choice
-    run_option "$choice"
-done
+# Main execution
+if [[ "$FULL_INSTALL" == "true" ]]; then
+    # Run automatic full installation
+    full_install true
+else
+    # Run interactive menu loop
+    while true; do
+        show_menu
+        read -p "Enter your choice: " choice
+        run_option "$choice"
+    done
+fi

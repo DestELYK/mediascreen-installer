@@ -64,6 +64,29 @@ function exit_prompt() {
     fi
 }
 
+migrate() {
+    log "Migrating old script files..."
+    # List of old files to check and delete from /usr/local/bin
+    old_files=(
+        "autologin-setup.sh",
+        "autoupdates-setup.sh",
+        "browser-setup.sh",
+        "firewall-setup.sh",
+        "mediascreen-util.sh",
+        "hide-grub.sh",
+        "splashscreen-setup.sh",
+        "wifi-setup.sh",
+    )
+
+    for file in "${old_files[@]}"; do
+        target="/usr/local/bin/$file"
+        if [[ -f "$target" ]]; then
+            log "Found $target, removing..."
+            rm -f "$target"
+        fi
+    done
+}
+
 trap exit_prompt SIGINT
 
 # Network connectivity check
@@ -269,6 +292,8 @@ else
         }
     fi
 fi
+
+migrate
 
 # Validate configuration file
 validate_config "$CONFIG_DIR/menu_config.txt" || exit 1

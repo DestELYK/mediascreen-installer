@@ -2,7 +2,11 @@
 
 # Source common library
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../lib/common.sh"
+if ! source "$SCRIPT_DIR/../lib/common.sh"; then
+    echo "ERROR: Failed to load common library"
+    echo "Please ensure MediaScreen installer components are properly installed."
+    exit 1
+fi
 
 <<comment
     This script configures automatic reboot scheduling for MediaScreen systems.

@@ -379,6 +379,97 @@ prompt_yes_no() {
     done
 }
 
+# Parse and validate browser-users configuration
+parse_browser_users() {
+    local browser_users_string="$1"
+    local -n parsed_users_ref=$2  # Reference to associative array
+    local -n usernames_ref=$3     # Reference to array of usernames
+    
+    if [[ -z "$browser_users_string" ]]; then
+        log_error "Browser users string is empty"
+        return 1
+    fi
+    
+    # Clear the arrays
+    for key in "${!parsed_users_ref[@]}"; do
+        unset parsed_users_ref["$key"]
+    done
+    usernames_ref=()
+    
+    local browser_count=0
+    local seen_usernames=()
+    
+    # Parse comma-separated browser configurations
+    IFS=',' read -ra BROWSER_PAIRS <<< "$browser_users_string"
+    for pair in "${BROWSER_PAIRS[@]}"; do
+        IFS=':' read -ra PARTS <<< "$pair"
+        if [[ ${#PARTS[@]} -ne 3 ]]; then
+            log_error "Invalid browser-users format: $pair"
+            log_error "Expected format: user:tty:url"
+            return 1
+        fi
+        
+        local user="${PARTS[0]}"
+        local tty="${PARTS[1]}"
+        local url="${PARTS[2]}"
+        
+        # Validate username format
+        if [[ ! $user =~ ^[a-zA-Z0-9_][a-zA-Z0-9_-]*$ ]]; then
+            log_error "Invalid username format: $user (use only alphanumeric characters, underscores, and hyphens)"
+            return 1
+        fi
+        
+        if [[ ${#user} -gt 32 ]]; then
+            log_error "Username too long: $user (maximum 32 characters allowed)"
+            return 1
+        fi
+        
+        # Validate TTY format
+        if [[ ! $tty =~ ^tty[0-9]+$ ]]; then
+            log_error "Invalid TTY format: $tty (expected format: tty1, tty2, etc.)"
+            return 1
+        fi
+        
+        # Validate URL format
+        if [[ ! $url =~ ^https?://[a-zA-Z0-9.-]+([:/][^[:space:]]*)?$ ]]; then
+            log_error "Invalid URL format: $url (must start with http:// or https://)"
+            return 1
+        fi
+        
+        # Check if TTY is tty12 (reserved for menu)
+        if [[ "$tty" == "tty12" ]]; then
+            log_error "tty12 is reserved for menu. Use tty1-tty11 for browsers."
+            return 1
+        fi
+        
+        # Check for duplicate TTYs
+        if [[ -n "${parsed_users_ref[$tty]:-}" ]]; then
+            log_error "Duplicate TTY assignment: $tty"
+            return 1
+        fi
+        
+        # Store the configuration
+        parsed_users_ref["$tty"]="$user:$url"
+        
+        # Track unique usernames
+        if [[ ! " ${seen_usernames[*]} " =~ " $user " ]]; then
+            seen_usernames+=("$user")
+            usernames_ref+=("$user")
+        fi
+        
+        browser_count=$((browser_count + 1))
+        log_debug "Parsed browser config: $user -> $tty -> $url"
+    done
+    
+    if [[ $browser_count -gt 11 ]]; then
+        log_error "Too many browsers configured ($browser_count). Maximum 11 browsers allowed (tty12 is reserved for menu)."
+        return 1
+    fi
+    
+    log_info "Successfully parsed $browser_count browser configuration(s) for ${#usernames_ref[@]} unique user(s)"
+    return 0
+}
+
 # Exit handling
 setup_exit_handler() {
     function exit_prompt() {

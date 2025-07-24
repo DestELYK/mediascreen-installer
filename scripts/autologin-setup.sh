@@ -2,7 +2,11 @@
 
 # Source common library
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../lib/common.sh"
+if ! source "$SCRIPT_DIR/../lib/common.sh"; then
+    echo "ERROR: Failed to load common library from $SCRIPT_DIR/../lib/common.sh"
+    echo "Please ensure the common library is installed and accessible."
+    exit 1
+fi
 
 <<comment
     This script sets up autologin for multiple browser users and one menu user on different TTYs,
@@ -329,68 +333,6 @@ check_tty_url_configured() {
         log_warn "TTY $tty has no URL configured in $config_file"
         return 1
     fi
-}
-
-# Parse browser users string
-parse_browser_users() {
-    local users_string="$1"
-    declare -ga BROWSER_USER_LIST
-    declare -ga BROWSER_TTY_LIST
-    declare -ga BROWSER_URL_LIST
-    
-    if [[ -z "$users_string" ]]; then
-        return 0
-    fi
-    
-    # Split by comma
-    IFS=',' read -ra USER_TTY_PAIRS <<< "$users_string"
-    
-    for pair in "${USER_TTY_PAIRS[@]}"; do
-        if [[ "$pair" == *":"* ]]; then
-            # Parse user:tty or user:tty:url format more carefully
-            # First, extract the user (everything before first colon)
-            local user="${pair%%:*}"
-            local remaining="${pair#*:}"
-            
-            # Now check if remaining has another colon (indicating URL)
-            if [[ "$remaining" == *":"* ]]; then
-                # Format: user:tty:url
-                local tty="${remaining%%:*}"
-                local url="${remaining#*:}"
-            else
-                # Format: user:tty
-                local tty="$remaining"
-                local url=""
-            fi
-            
-            # Validate user and tty
-            if validate_username "$user" && validate_tty "$tty"; then
-                # Validate URL if provided
-                if [[ -n "$url" ]] && ! validate_url "$url"; then
-                    log_error "Invalid URL in browser users: $url"
-                    return 1
-                fi
-                
-                BROWSER_USER_LIST+=("$user")
-                BROWSER_TTY_LIST+=("$tty")
-                BROWSER_URL_LIST+=("$url")
-                
-                if [[ -n "$url" ]]; then
-                    log_debug "Added browser user: $user on $tty with URL: $url"
-                else
-                    log_debug "Added browser user: $user on $tty (no URL specified)"
-                fi
-            else
-                log_error "Invalid user:tty pair: $pair"
-                return 1
-            fi
-        else
-            log_error "Invalid format in browser users: $pair. Expected user:tty or user:tty:url"
-            return 1
-        fi
-    done
-    
-    return 0
 }
 
 get_username() {
@@ -781,7 +723,35 @@ main() {
     
     # Parse browser users if provided
     if [[ -n "$BROWSER_USERS" ]]; then
-        parse_browser_users "$BROWSER_USERS" || report_failure "Parsing browser users"
+        # Initialize arrays
+        declare -ga BROWSER_USER_LIST=()
+        declare -ga BROWSER_TTY_LIST=()
+        declare -ga BROWSER_URL_LIST=()
+        
+        # Use common library function for parsing
+        declare -A parsed_browsers
+        declare -a unique_usernames
+        
+        if parse_browser_users "$BROWSER_USERS" parsed_browsers unique_usernames; then
+            # Convert from common library format to local arrays
+            for tty in "${!parsed_browsers[@]}"; do
+                local user_url="${parsed_browsers[$tty]}"
+                local user="${user_url%%:*}"
+                local url="${user_url#*:}"
+                
+                BROWSER_USER_LIST+=("$user")
+                BROWSER_TTY_LIST+=("$tty")
+                BROWSER_URL_LIST+=("$url")
+                
+                if [[ -n "$url" ]]; then
+                    log_debug "Added browser user: $user on $tty with URL: $url"
+                else
+                    log_debug "Added browser user: $user on $tty (no URL specified)"
+                fi
+            done
+        else
+            report_failure "Parsing browser users with common library"
+        fi
     else
         # Initialize empty arrays if no browser users provided
         declare -ga BROWSER_USER_LIST=()
