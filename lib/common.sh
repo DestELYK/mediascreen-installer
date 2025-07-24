@@ -92,6 +92,37 @@ validate_username() {
     return 0
 }
 
+# Configuration file validation
+validate_config() {
+    local config_file="$1"
+    local line_count
+    
+    if [[ ! -f "$config_file" ]]; then
+        log_error "Configuration file not found: $config_file"
+        return 1
+    fi
+    
+    line_count=$(wc -l < "$config_file")
+    if [[ $line_count -eq 0 ]]; then
+        log_error "Configuration file is empty"
+        return 1
+    fi
+    
+    # Check for proper CSV format with 5 fields: menu_order,run_order,name,description,filename
+    # run_order can be numeric or contain _ for manual-only items
+    while IFS="" read -r line || [ -n "$line" ]; do
+        if [[ -n "$line" && ! "$line" =~ ^[0-9]+,([0-9]+|[0-9]*_[0-9]*|_),[^,]+,[^,]+,[^,]+$ ]]; then
+            log_error "Invalid configuration line format: $line"
+            log_error "Expected format: menu_order,run_order,name,description,filename"
+            log_error "run_order can be numeric (1,2,3...) or contain _ for manual-only items (_,1_,_2,etc.)"
+            return 1
+        fi
+    done < "$config_file"
+    
+    log_info "Configuration file validated successfully ($line_count entries)"
+    return 0
+}
+
 create_user_if_not_exists() {
     local username="$1"
     
