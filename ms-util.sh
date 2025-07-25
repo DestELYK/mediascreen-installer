@@ -116,83 +116,14 @@ if [[ "$FULL_INSTALL" == "true" ]]; then
         exit 1
     fi
     
-    # Extract username from first browser configuration and validate format
-    first_user=""
-    IFS=',' read -ra BROWSER_PAIRS <<< "$AUTO_BROWSER_USERS"
-    IFS=':' read -ra FIRST_PARTS <<< "${BROWSER_PAIRS[0]}"
-    first_user="${FIRST_PARTS[0]}"
+    # Validate browser-users format using common library
+    declare -A parsed_browsers
+    declare -a unique_usernames
     
-    if [[ -z "$first_user" ]]; then
-        echo "ERROR: Invalid browser-users format. Cannot extract username."
-        echo "Expected format: user:tty:url,user:tty:url,..."
+    if ! parse_browser_users "$AUTO_BROWSER_USERS" parsed_browsers unique_usernames; then
+        echo "ERROR: Browser-users validation failed"
         exit 1
     fi
-    
-    # Validate username format
-    if [[ ! $first_user =~ ^[a-zA-Z0-9_][a-zA-Z0-9_-]*$ ]]; then
-        echo "ERROR: Invalid username format in browser-users. Use only alphanumeric characters, underscores, and hyphens."
-        exit 1
-    fi
-    
-    if [[ ${#first_user} -gt 32 ]]; then
-        echo "ERROR: Username too long. Maximum 32 characters allowed."
-        exit 1
-    fi
-    
-    # Validate browser-users format and count browsers
-    local browser_count=0
-    for pair in "${BROWSER_PAIRS[@]}"; do
-        IFS=':' read -ra PARTS <<< "$pair"
-        if [[ ${#PARTS[@]} -ne 3 ]]; then
-            echo "ERROR: Invalid browser-users format: $pair"
-            echo "Expected format: user:tty:url"
-            exit 1
-        fi
-        
-        local user="${PARTS[0]}"
-        local tty="${PARTS[1]}"
-        local url="${PARTS[2]}"
-        
-        # Validate TTY format
-        if [[ ! $tty =~ ^tty[0-9]+$ ]]; then
-            echo "ERROR: Invalid TTY format: $tty (expected format: tty1, tty2, etc.)"
-            exit 1
-        fi
-        
-        # Validate URL format
-        if [[ ! $url =~ ^https?://[a-zA-Z0-9.-]+([:/][^[:space:]]*)?$ ]]; then
-            echo "ERROR: Invalid URL format: $url (must start with http:// or https://)"
-            exit 1
-        fi
-        
-        # Check if TTY is tty12 (reserved for menu)
-        if [[ "$tty" == "tty12" ]]; then
-            echo "ERROR: tty12 is reserved for menu. Use tty1-tty11 for browsers."
-            exit 1
-        fi
-        
-        browser_count=$((browser_count + 1))
-    done
-    
-    if [[ $browser_count -gt 11 ]]; then
-        echo "ERROR: Too many browsers configured ($browser_count). Maximum 11 browsers allowed (tty12 is reserved for menu)."
-        exit 1
-    fi
-    
-    # Set default menu TTY if not provided
-    if [[ -z "$AUTO_MENU_TTY" ]]; then
-        AUTO_MENU_TTY="tty12"
-    fi
-    
-    echo "INFO: Full install configuration:"
-    echo "  Username: $first_user"
-    echo "  Browser configurations ($browser_count):"
-    for pair in "${BROWSER_PAIRS[@]}"; do
-        IFS=':' read -ra PARTS <<< "$pair"
-        echo "    ${PARTS[0]} -> ${PARTS[1]} -> ${PARTS[2]}"
-    done
-    echo "  Menu: root -> $AUTO_MENU_TTY"
-    echo
     
     log "Full install mode enabled with browser configurations: $AUTO_BROWSER_USERS"
     log "Menu TTY: $AUTO_MENU_TTY"
