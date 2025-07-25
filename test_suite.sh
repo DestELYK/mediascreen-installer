@@ -19,7 +19,7 @@ TESTS_FAILED=0
 test_result() {
     local test_name="$1"
     local result="$2"
-    local message="$3"
+    local message="${3:-}"
     
     TESTS_RUN=$((TESTS_RUN + 1))
     
@@ -88,12 +88,12 @@ echo "Test 3: Checking core script availability..."
 CORE_SCRIPTS=(
     "configure-network.sh"
     "autologin-setup.sh" 
-    "browser-setup.sh"
     "firewall-setup.sh"
     "hide-grub.sh"
     "splashscreen-setup.sh"
     "autoupdates-setup.sh"
     "reboot-setup.sh"
+    "screen-switch.sh"
 )
 
 all_scripts_present=true
@@ -271,6 +271,12 @@ for script in "${CORE_SCRIPTS[@]}"; do
             continue
         fi
         
+        # Skip screen-switch.sh as it's a utility script that doesn't need common args
+        if [[ "$script" == "screen-switch.sh" ]]; then
+            test_result "$script present (utility script)" "PASS"
+            continue
+        fi
+        
         # Check if script sources common library
         if grep -q "source.*common.sh" "$SCRIPT_DIR/$script"; then
             test_result "$script uses common library" "PASS"
@@ -350,6 +356,180 @@ if grep -q "\-\-help" "$REPO_DIR/ms-util.sh"; then
     test_result "Menu utility help functionality" "PASS"
 else
     test_result "Menu utility help functionality" "FAIL" "Help option not found in script"
+fi
+
+# Test 13: Browser-users parsing functionality
+echo
+echo "Test 13: Testing parse_browser_users function..."
+
+# Source the common library for testing
+if source "$COMMON_LIB" 2>/dev/null; then
+    test_result "Common library sourcing" "PASS"
+    
+    # Test cases for parse_browser_users function
+    declare -A test_browsers
+    declare -a test_usernames
+    
+    # Test 1: Basic valid configuration
+    test_case="user1:tty1:https://example.com"
+    if parse_browser_users "$test_case" test_browsers test_usernames 2>/dev/null; then
+        if [[ "${#test_browsers[@]}" -eq 1 && "${test_usernames[0]}" == "user1" ]]; then
+            test_result "Basic browser-users parsing" "PASS"
+        else
+            test_result "Basic browser-users parsing" "FAIL" "Incorrect parsing result"
+        fi
+    else
+        test_result "Basic browser-users parsing" "FAIL" "Function returned error"
+    fi
+    
+    # Clear arrays for next test
+    unset test_browsers
+    unset test_usernames
+    declare -A test_browsers
+    declare -a test_usernames
+    
+    # Test 2: Complex URL with colons and anchors
+    test_case="mediascreen:tty1:https://app.novisign.com/wplayer/#/pages/home"
+    if parse_browser_users "$test_case" test_browsers test_usernames 2>/dev/null; then
+        if [[ "${#test_browsers[@]}" -eq 1 && "${test_usernames[0]}" == "mediascreen" ]]; then
+            test_result "Complex URL parsing" "PASS"
+        else
+            test_result "Complex URL parsing" "FAIL" "Failed to parse URL with colons"
+        fi
+    else
+        test_result "Complex URL parsing" "FAIL" "Function returned error"
+    fi
+    
+    # Clear arrays for next test
+    unset test_browsers
+    unset test_usernames
+    declare -A test_browsers
+    declare -a test_usernames
+    
+    # Test 3: Multiple browser configurations
+    test_case="user1:tty1:https://example.com,user2:tty2:http://localhost:3000"
+    if parse_browser_users "$test_case" test_browsers test_usernames 2>/dev/null; then
+        if [[ "${#test_browsers[@]}" -eq 2 && "${#test_usernames[@]}" -eq 2 ]]; then
+            test_result "Multiple browsers parsing" "PASS"
+        else
+            test_result "Multiple browsers parsing" "FAIL" "Incorrect count of parsed browsers"
+        fi
+    else
+        test_result "Multiple browsers parsing" "FAIL" "Function returned error"
+    fi
+    
+    # Clear arrays for next test
+    unset test_browsers
+    unset test_usernames
+    declare -A test_browsers
+    declare -a test_usernames
+    
+    # Test 4: URL with port and query parameters
+    test_case="testuser:tty3:https://site.com:8080/path?param=value#anchor"
+    if parse_browser_users "$test_case" test_browsers test_usernames 2>/dev/null; then
+        if [[ "${#test_browsers[@]}" -eq 1 && "${test_usernames[0]}" == "testuser" ]]; then
+            test_result "URL with port and parameters" "PASS"
+        else
+            test_result "URL with port and parameters" "FAIL" "Failed to parse complex URL"
+        fi
+    else
+        test_result "URL with port and parameters" "FAIL" "Function returned error"
+    fi
+    
+    # Clear arrays for next test
+    unset test_browsers
+    unset test_usernames
+    declare -A test_browsers
+    declare -a test_usernames
+    
+    # Test 5: Invalid format (should fail)
+    test_case="invalid_format_no_colons"
+    if parse_browser_users "$test_case" test_browsers test_usernames 2>/dev/null; then
+        test_result "Invalid format rejection" "FAIL" "Function should have rejected invalid format"
+    else
+        test_result "Invalid format rejection" "PASS"
+    fi
+    
+    # Clear arrays for next test
+    unset test_browsers
+    unset test_usernames
+    declare -A test_browsers
+    declare -a test_usernames
+    
+    # Test 6: Reserved TTY (tty12 should fail)
+    test_case="user:tty12:https://example.com"
+    if parse_browser_users "$test_case" test_browsers test_usernames 2>/dev/null; then
+        test_result "Reserved TTY rejection" "FAIL" "Function should reject tty12"
+    else
+        test_result "Reserved TTY rejection" "PASS"
+    fi
+    
+    # Clear arrays for next test
+    unset test_browsers
+    unset test_usernames
+    declare -A test_browsers
+    declare -a test_usernames
+    
+    # Test 7: Invalid username format (should fail)
+    test_case="123invalid!:tty1:https://example.com"
+    if parse_browser_users "$test_case" test_browsers test_usernames 2>/dev/null; then
+        test_result "Invalid username rejection" "FAIL" "Function should reject usernames with special characters"
+    else
+        test_result "Invalid username rejection" "PASS"
+    fi
+    
+    # Clear arrays for next test
+    unset test_browsers
+    unset test_usernames
+    declare -A test_browsers
+    declare -a test_usernames
+    
+    # Test 8: Duplicate TTY (should fail)
+    test_case="user1:tty1:https://example.com,user2:tty1:https://example2.com"
+    if parse_browser_users "$test_case" test_browsers test_usernames 2>/dev/null; then
+        test_result "Duplicate TTY rejection" "FAIL" "Function should reject duplicate TTYs"
+    else
+        test_result "Duplicate TTY rejection" "PASS"
+    fi
+    
+    # Clear arrays for next test
+    unset test_browsers
+    unset test_usernames
+    declare -A test_browsers
+    declare -a test_usernames
+    
+    # Test 9: Quote stripping functionality
+    test_case="'user1:tty1:https://example.com'"
+    if parse_browser_users "$test_case" test_browsers test_usernames 2>/dev/null; then
+        if [[ "${#test_browsers[@]}" -eq 1 && "${test_usernames[0]}" == "user1" ]]; then
+            test_result "Quote stripping" "PASS"
+        else
+            test_result "Quote stripping" "FAIL" "Failed to strip quotes properly"
+        fi
+    else
+        test_result "Quote stripping" "FAIL" "Function returned error"
+    fi
+    
+    # Clear arrays for next test
+    unset test_browsers
+    unset test_usernames
+    declare -A test_browsers
+    declare -a test_usernames
+    
+    # Test 10: Mixed quote types stripping
+    test_case='"user2:tty2:https://test.com"'
+    if parse_browser_users "$test_case" test_browsers test_usernames 2>/dev/null; then
+        if [[ "${#test_browsers[@]}" -eq 1 && "${test_usernames[0]}" == "user2" ]]; then
+            test_result "Double quote stripping" "PASS"
+        else
+            test_result "Double quote stripping" "FAIL" "Failed to strip double quotes properly"
+        fi
+    else
+        test_result "Double quote stripping" "FAIL" "Function returned error"
+    fi
+    
+else
+    test_result "Common library sourcing" "FAIL" "Cannot source common library for testing"
 fi
 
 # Summary

@@ -480,6 +480,8 @@ parse_browser_users() {
         log_error "Browser users string is empty"
         return 1
     fi
+
+    browser_users_string=$(strip_quotes "$browser_users_string")
     
     # Clear the arrays
     for key in "${!parsed_users_ref[@]}"; do
@@ -500,9 +502,9 @@ parse_browser_users() {
             return 1
         fi
         
-        local user="${BASH_REMATCH[1]}"
-        local tty="${BASH_REMATCH[2]}"
-        local url="${BASH_REMATCH[3]}"
+        local user="$(strip_quotes "${BASH_REMATCH[1]}")"
+        local tty="$(strip_quotes "${BASH_REMATCH[2]}")"
+        local url="$(strip_quotes "${BASH_REMATCH[3]}")"
         
         # Validate username format
         if [[ ! $user =~ ^[a-zA-Z0-9_][a-zA-Z0-9_-]*$ ]]; then
