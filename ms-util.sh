@@ -117,7 +117,7 @@ if [[ "$FULL_INSTALL" == "true" ]]; then
     fi
     
     # Extract username from first browser configuration and validate format
-    local first_user
+    first_user=""
     IFS=',' read -ra BROWSER_PAIRS <<< "$AUTO_BROWSER_USERS"
     IFS=':' read -ra FIRST_PARTS <<< "${BROWSER_PAIRS[0]}"
     first_user="${FIRST_PARTS[0]}"
