@@ -125,6 +125,25 @@ if [[ "$FULL_INSTALL" == "true" ]]; then
         exit 1
     fi
     
+    # Get the first username and browser count from parsed results
+    first_user="${unique_usernames[0]}"
+    browser_count="${#parsed_browsers[@]}"
+    
+    # Set default menu TTY if not provided
+    if [[ -z "$AUTO_MENU_TTY" ]]; then
+        AUTO_MENU_TTY="tty12"
+    fi
+    
+    echo "INFO: Full install configuration:"
+    echo "  Username: $first_user"
+    echo "  Browser configurations ($browser_count):"
+    for tty in "${!parsed_browsers[@]}"; do
+        IFS=':' read -ra PARTS <<< "${parsed_browsers[$tty]}"
+        echo "    ${PARTS[0]} -> $tty -> ${PARTS[1]}"
+    done
+    echo "  Menu: root -> $AUTO_MENU_TTY"
+    echo
+    
     log "Full install mode enabled with browser configurations: $AUTO_BROWSER_USERS"
     log "Menu TTY: $AUTO_MENU_TTY"
 fi
@@ -321,7 +340,7 @@ full_install() {
     fi
 
     # Prepare common arguments for all scripts
-    local common_args="-y --username='$username'"
+    local common_args="-y"
     
     # Add debug mode if enabled
     if [[ "$DEBUG_MODE" == "true" ]]; then

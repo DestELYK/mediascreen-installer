@@ -310,8 +310,8 @@ strip_quotes() {
 # Argument parsing
 parse_common_args() {
     local auto_install=false
-    local username=""
-    local url=""
+    local logo_url=""
+    local logo_mode=""
     local debug=false
     local use_dev=false
     local github_url=""
@@ -321,11 +321,11 @@ parse_common_args() {
             -y|--auto)
                 auto_install=true
                 ;;
-            --username=*)
-                username="$(strip_quotes "${arg#*=}")"
+            --logo-url=*)
+                logo_url="$(strip_quotes "${arg#*=}")"
                 ;;
-            --url=*)
-                url="$(strip_quotes "${arg#*=}")"
+            --logo-mode=*)
+                logo_mode="$(strip_quotes "${arg#*=}")"
                 ;;
             --github-url=*)
                 github_url="$(strip_quotes "${arg#*=}")"
@@ -339,13 +339,13 @@ parse_common_args() {
                 ;;
             -h|--help)
                 echo "Common options:"
-                echo "  -y, --auto        Run in automatic mode (non-interactive)"
-                echo "  --username=USER   Specify username for operations"
-                echo "  --url=URL         Specify URL for operations"
-                echo "  --github-url=URL  Use custom GitHub repository URL for downloads"
-                echo "  --debug           Enable debug logging"
-                echo "  --dev             Use development branch instead of main"
-                echo "  -h, --help        Show help message"
+                echo "  -y, --auto            Run in automatic mode (non-interactive)"
+                echo "  --logo-url=URL        Specify logo image URL for splash screen"
+                echo "  --logo-mode=MODE      Specify logo mode (url|upload|manual|default)"
+                echo "  --github-url=URL      Use custom GitHub repository URL for downloads"
+                echo "  --debug               Enable debug logging"
+                echo "  --dev                 Use development branch instead of main"
+                echo "  -h, --help            Show help message"
                 return 2  # Special return code to indicate help was shown
                 ;;
         esac
@@ -362,10 +362,16 @@ parse_common_args() {
         log_info "Using development branch for downloads"
     fi
     
+    # Handle logo-url override: if logo-url is provided, set logo-mode to "url"
+    if [[ -n "$logo_url" ]]; then
+        logo_mode="url"
+        log_info "Logo URL provided: $logo_url (mode automatically set to 'url')"
+    fi
+    
     # Export variables for use in calling script
     export AUTO_INSTALL="$auto_install"
-    export USERNAME="$username"
-    export URL="$url"
+    export LOGO_URL="$logo_url"
+    export LOGO_MODE="$logo_mode"
     export DEBUG="$debug"
     export GITHUB_BASE_URL
     export CUSTOM_GITHUB_URL
@@ -408,6 +414,60 @@ prompt_yes_no() {
                 ;;
         esac
     done
+}
+
+# Validate logo URL with fallback functionality
+validate_logo_url_with_fallback() {
+    local logo_url="$1"
+    local max_attempts=3
+    local attempt=1
+    
+    if [[ -z "$logo_url" ]]; then
+        log_debug "No logo URL provided"
+        return 1
+    fi
+    
+    log_info "Validating logo URL: $logo_url"
+    
+    while [[ $attempt -le $max_attempts ]]; do
+        log_debug "Logo URL validation attempt $attempt/$max_attempts"
+        
+        # Test if URL is accessible
+        local http_code=""
+        if command -v curl >/dev/null 2>&1; then
+            http_code=$(curl -fsSL -w "%{http_code}" --connect-timeout 10 --max-time 30 -o /dev/null "$logo_url" 2>/dev/null || echo "000")
+        elif command -v wget >/dev/null 2>&1; then
+            if timeout 30 wget -q --spider --timeout=10 "$logo_url" 2>/dev/null; then
+                http_code="200"
+            else
+                http_code="000"
+            fi
+        else
+            log_warn "Neither curl nor wget available for URL validation"
+            return 0  # Assume URL is valid if we can't test it
+        fi
+        
+        if [[ "$http_code" == "200" ]]; then
+            log_info "Logo URL validation successful"
+            return 0
+        else
+            log_warn "Logo URL validation failed (attempt $attempt/$max_attempts): HTTP $http_code"
+            attempt=$((attempt + 1))
+            
+            if [[ $attempt -le $max_attempts ]]; then
+                sleep 2  # Wait before retry
+            fi
+        fi
+    done
+    
+    log_error "Logo URL failed validation after $max_attempts attempts"
+    log_info "Falling back to upload mode for logo configuration"
+    
+    # Override the exported variables to use upload mode
+    export LOGO_MODE="upload"
+    export LOGO_URL=""
+    
+    return 1
 }
 
 # Parse and validate browser-users configuration

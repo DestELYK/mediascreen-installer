@@ -458,6 +458,7 @@ handle_web_upload() {
         
         echo "Upload completed successfully!"
         echo "=========================================="
+        echo "$target_file"
         return 0
     else
         echo "Upload was not completed."
@@ -470,14 +471,49 @@ handle_web_upload() {
 get_watermark_image() {
     local target_file="$TEMP_DIR/watermark.png"
     
-    if [[ -n "$URL" ]]; then
-        # Use URL from command line
-        download_watermark "$URL" "$target_file" || {
-            log_error "Failed to download image from provided URL"
+    if [[ -n "$LOGO_URL" ]]; then
+        # Validate logo URL with fallback functionality
+        if validate_logo_url_with_fallback "$LOGO_URL"; then
+            # Use logo URL from command line
+            if download_watermark "$LOGO_URL" "$target_file"; then
+                echo "$target_file"
+                return 0
+            else
+                log_error "Failed to download image from validated logo URL"
+                # If we're in auto mode, fall back to upload mode
+                if [[ "$AUTO_INSTALL" == "true" ]]; then
+                    log_info "Auto mode: Logo URL failed, falling back to default theme"
+                    return 1
+                else
+                    log_info "Logo URL failed, switching to upload mode"
+                    return 2
+                fi
+            fi
+        else
+            # Fallback was triggered, LOGO_MODE is now "upload"
+            log_info "Logo URL validation failed, switching to upload mode"
+            # In auto mode, use default theme instead of upload
+            if [[ "$AUTO_INSTALL" == "true" ]]; then
+                log_info "Auto mode: Using default theme instead of upload mode"
+                return 1
+            else
+                return 2
+            fi
+        fi
+    fi
+    
+    # Handle based on current logo mode (may have been changed by fallback)
+    if [[ "$LOGO_MODE" == "upload" ]]; then
+        # In auto mode, don't use upload mode - use default theme
+        if [[ "$AUTO_INSTALL" == "true" ]]; then
+            log_info "Auto mode: Upload mode requested but not supported, using default theme"
             return 1
-        }
+        else
+            # Signal upload mode to main function
+            return 2  # Special return code to indicate upload mode should be handled by main
+        fi
     elif [[ "$AUTO_INSTALL" == "true" ]]; then
-        # Auto mode without URL - skip custom watermark
+        # Auto mode without logo URL - skip custom watermark
         log_info "Auto mode: Skipping custom watermark, using default theme"
         return 1  # Signal to use default theme
     else
@@ -498,18 +534,16 @@ get_watermark_image() {
                     while true; do
                         read -p "Enter image URL (png, jpg, jpeg, gif, bmp): " image_url
                         if [[ -n "$image_url" ]] && download_watermark "$image_url" "$target_file"; then
-                            break 2
+                            echo "$target_file"
+                            return 0
                         fi
                         
                         echo "Please try again with a valid image URL."
                     done
                     ;;
                 2)
-                    if handle_web_upload "$target_file"; then
-                        break
-                    else
-                        echo "Web upload failed. Please try another option."
-                    fi
+                    # Signal upload mode to main function
+                    return 2
                     ;;
                 3)
                     echo
@@ -524,7 +558,8 @@ get_watermark_image() {
                     if [[ -f "$upload_file" ]]; then
                         cp "$upload_file" "$target_file"
                         log_info "Watermark file found and copied"
-                        break
+                        echo "$target_file"
+                        return 0
                     else
                         echo "Watermark file not found at $upload_file"
                         echo "Please try again."
@@ -540,9 +575,6 @@ get_watermark_image() {
             esac
         done
     fi
-    
-    echo "$target_file"
-    return 0
 }
 
 # Create custom Plymouth theme
@@ -703,17 +735,38 @@ main() {
     fi
     
     # Handle watermark and theme setup
+    local watermark_result
     local watermark_file
-    if watermark_file=$(get_watermark_image); then
-        # Custom watermark provided
-        log_info "Setting up custom splash screen with watermark"
-        create_custom_theme "$watermark_file" || report_failure "Custom theme creation"
-        set_plymouth_theme "$CUSTOM_THEME_NAME" || report_failure "Custom theme activation"
-    else
-        # Use default theme
-        log_info "Setting up default splash screen theme"
-        choose_default_theme || report_failure "Default theme setup"
-    fi
+    
+    # Get watermark image and handle different return codes
+    watermark_file=$(get_watermark_image)
+    watermark_result=$?
+    
+    case $watermark_result in
+        0)
+            # Custom watermark provided successfully
+            log_info "Setting up custom splash screen with watermark"
+            create_custom_theme "$watermark_file" || report_failure "Custom theme creation"
+            set_plymouth_theme "$CUSTOM_THEME_NAME" || report_failure "Custom theme activation"
+            ;;
+        2)
+            # Upload mode triggered - start upload server
+            log_info "Starting upload server for watermark image"
+            if watermark_file=$(handle_web_upload "$TEMP_DIR/watermark.png") && [[ -n "$watermark_file" ]]; then
+                log_info "Setting up custom splash screen with uploaded watermark"
+                create_custom_theme "$watermark_file" || report_failure "Custom theme creation"
+                set_plymouth_theme "$CUSTOM_THEME_NAME" || report_failure "Custom theme activation"
+            else
+                log_info "Upload failed, using default theme"
+                choose_default_theme || report_failure "Default theme setup"
+            fi
+            ;;
+        *)
+            # Use default theme (return code 1 or any other error)
+            log_info "Setting up default splash screen theme"
+            choose_default_theme || report_failure "Default theme setup"
+            ;;
+    esac
     
     # Test configuration
     test_plymouth || log_warn "Plymouth configuration test had issues"
