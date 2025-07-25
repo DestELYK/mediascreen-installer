@@ -493,16 +493,16 @@ parse_browser_users() {
     # Parse comma-separated browser configurations
     IFS=',' read -ra BROWSER_PAIRS <<< "$browser_users_string"
     for pair in "${BROWSER_PAIRS[@]}"; do
-        IFS=':' read -ra PARTS <<< "$pair"
-        if [[ ${#PARTS[@]} -ne 3 ]]; then
+        # Split only on the first two colons to handle URLs with colons
+        if [[ ! "$pair" =~ ^([^:]+):([^:]+):(.+)$ ]]; then
             log_error "Invalid browser-users format: $pair"
             log_error "Expected format: user:tty:url"
             return 1
         fi
         
-        local user="${PARTS[0]}"
-        local tty="${PARTS[1]}"
-        local url="${PARTS[2]}"
+        local user="${BASH_REMATCH[1]}"
+        local tty="${BASH_REMATCH[2]}"
+        local url="${BASH_REMATCH[3]}"
         
         # Validate username format
         if [[ ! $user =~ ^[a-zA-Z0-9_][a-zA-Z0-9_-]*$ ]]; then
