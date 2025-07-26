@@ -474,8 +474,9 @@ setup_menu_autologin() {
         backup_file "$profile_file"
     fi
     
-    # Install the profile
+    # Install the profile and replace tty1 with the correct TTY
     cp "$temp_file" "$profile_file"
+    sed -i "s|/dev/tty1|/dev/$tty|g" "$profile_file"
     chmod 644 "$profile_file"
     
     log_info "Menu autologin setup completed for root on $tty"
