@@ -82,7 +82,7 @@ done
 validate_tty() {
     local tty="$1"
     
-    if [[ ! $tty =~ ^tty[1-9][0-9]*$ ]]; then
+    if [[ ! $tty =~ ^tty([1-9]|1[0-2])$ ]]; then
         log_error "Invalid TTY format: $tty. Use format: tty1, tty2, etc."
         return 1
     fi
