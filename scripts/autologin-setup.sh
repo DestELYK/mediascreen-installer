@@ -67,10 +67,10 @@ fi
 for arg in "$@"; do
     case $arg in
         --browser-users=*)
-            BROWSER_USERS="${arg#*=}"
+            BROWSER_USERS="$(strip_quotes "${arg#*=}")"
             ;;
         --menu-tty=*)
-            MENU_TTY="${arg#*=}"
+            MENU_TTY="$(strip_quotes "${arg#*=}")"
             ;;
         *)
             # Skip common arguments that were already processed

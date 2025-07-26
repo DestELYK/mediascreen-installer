@@ -94,10 +94,10 @@ for arg in "$@"; do
             FULL_INSTALL=true
             ;;
         --browser-users=*)
-            AUTO_BROWSER_USERS="${arg#*=}"
+            AUTO_BROWSER_USERS="$(strip_quotes "${arg#*=}")"
             ;;
         --menu-tty=*)
-            AUTO_MENU_TTY="${arg#*=}"
+            AUTO_MENU_TTY="$(strip_quotes "${arg#*=}")"
             ;;
         *)
             # Common library handles other args
