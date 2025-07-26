@@ -24,6 +24,7 @@ CONFIG_DIR="/etc/mediascreen"
 INSTALLER_DIR="/usr/local/bin/mediascreen-installer"
 SCRIPTS_DIR="$INSTALLER_DIR/scripts"
 COMMON_LIB="$INSTALLER_DIR/lib/common.sh"
+AUTO_REBOOT_TIME="20"  # Default auto-reboot time in seconds
 
 # Load common library - required for operation
 if [[ -f "$COMMON_LIB" ]]; then
@@ -472,7 +473,7 @@ full_install() {
     
     if [[ "$auto_mode" == "true" ]]; then
         echo -n "Rebooting in "
-        for i in {10..1}; do
+        for i in $(seq $AUTO_REBOOT_TIME -1 1); do
             echo -n "$i..."
             sleep 1
         done

@@ -24,7 +24,6 @@ if [ -z $DISPLAY ] && [ $(tty) = /dev/tty1 ]; then
 
   if sudo ms-util --full-install --browser-users='mediascreen:tty1:https://app.novisign.com/wplayer/#/pages/home'; then
     echo "MediaScreen installation completed successfully!"
-    rm .bash_profile 2>/dev/null || true
   else
     echo ""
     echo "ERROR: MediaScreen installation failed!"
