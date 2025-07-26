@@ -199,34 +199,14 @@ install_browser_packages() {
         return 1
     }
     
-    # List of required packages
-    local packages=(
-        "xserver-xorg-video-all"
-        "xserver-xorg-input-all" 
-        "xserver-xorg-core"
-        "xinit"
-        "x11-xserver-utils"
-        "chromium"
-        "unclutter"
-    )
+    # Install core X11 packages without recommended packages (lighter install)
+    install_package "xserver-xorg-core xinit x11-xserver-utils" "core X11 packages" "true" || return 1
     
-    # Install packages
-    for package in "${packages[@]}"; do
-        case $package in
-            "chromium")
-                install_package "$package" "Chromium browser" || return 1
-                ;;
-            "unclutter")
-                install_package "$package" "cursor hiding utility" || return 1
-                ;;
-            "xinit")
-                install_package "$package" "X11 initialization" || return 1
-                ;;
-            *)
-                install_package "$package" || return 1
-                ;;
-        esac
-    done
+    # Install video and input drivers with recommendations (for hardware compatibility)
+    install_package "xserver-xorg-video-all xserver-xorg-input-all" "X11 drivers" || return 1
+    
+    # Install browser and utilities
+    install_package "chromium unclutter" "browser and utilities" || return 1
     
     log_info "All required packages installed successfully"
 }
@@ -550,24 +530,41 @@ reload_systemd_and_restart_getty() {
         return 1
     }
     
-    # Restart getty services that are enabled
+    # Get current TTY to avoid restarting it
+    local current_tty=""
+    if [[ -t 0 ]]; then
+        current_tty=$(tty 2>/dev/null | sed 's#/dev/##' 2>/dev/null || true)
+    fi
+    
+    # Restart getty services that are enabled, except current TTY
     for i in "${!BROWSER_USER_LIST[@]}"; do
         local tty="${BROWSER_TTY_LIST[$i]}"
         local service="getty@${tty}.service"
         
-        systemctl restart "$service" || {
-            log_warn "Failed to restart $service"
-        }
+        if [[ "$tty" == "$current_tty" ]]; then
+            log_info "Skipping restart of $service (current TTY)"
+            log_info "Changes will take effect on next login or reboot"
+        else
+            systemctl restart "$service" || {
+                log_warn "Failed to restart $service"
+            }
+        fi
     done
     
     if [[ -n "$MENU_TTY" ]]; then
         local service="getty@${MENU_TTY}.service"
-        systemctl restart "$service" || {
-            log_warn "Failed to restart $service"
-        }
+        
+        if [[ "$MENU_TTY" == "$current_tty" ]]; then
+            log_info "Skipping restart of $service (current TTY)"
+            log_info "Changes will take effect on next login or reboot"
+        else
+            systemctl restart "$service" || {
+                log_warn "Failed to restart $service"
+            }
+        fi
     fi
     
-    log_info "Services restarted successfully"
+    log_info "Services restarted successfully (current TTY skipped)"
 }
 
 # Interactive configuration

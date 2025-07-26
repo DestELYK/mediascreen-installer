@@ -149,19 +149,31 @@ update_package_cache() {
 }
 
 install_package() {
-    local package="$1"
-    local description="${2:-$package}"
+    local packages="$1"
+    local description="${2:-$packages}"
+    local no_recommends="${3:-false}"
     
-    if ! dpkg -l | grep -q "^ii  $package "; then
-        log_info "Installing $description..."
-        apt install -y "$package" || {
-            log_error "Failed to install $package"
-            return 1
-        }
-        log_info "$description installed successfully"
-    else
-        log_debug "$description is already installed"
+    # Convert array notation to space-separated string if needed
+    if [[ "$packages" =~ ^\( ]]; then
+        # Remove parentheses and convert to space-separated
+        packages="${packages#(}"
+        packages="${packages%)}"
+        packages="${packages//\"}"
     fi
+    
+    log_info "Installing $description..."
+    
+    local apt_args="-y"
+    if [[ "$no_recommends" == "true" ]]; then
+        apt_args+=" --no-install-recommends"
+        log_debug "Installing packages without recommended packages"
+    fi
+    
+    apt install $apt_args $packages || {
+        log_error "Failed to install: $packages"
+        return 1
+    }
+    log_info "$description installed successfully"
 }
 
 # File operations

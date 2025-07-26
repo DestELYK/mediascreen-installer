@@ -1,4 +1,4 @@
-if [ -z $DISPLAY ] && [ $(tty) = /dev/tty2 ]; then
+if [ -z $DISPLAY ] && [ $(tty) = /dev/tty1 ]; then
   echo "Waiting for connection..."
   while ! ping -c 1 -W 1 google.com >/dev/null; do
     sleep 1
@@ -17,9 +17,20 @@ if [ -z $DISPLAY ] && [ $(tty) = /dev/tty2 ]; then
 
   chmod +x install.sh
 
-  sudo mv install.sh /usr/local/bin/mediascreen-util.sh
+  echo "Installing Media Screen components..."
+  sudo ./install.sh
 
-  echo "Launching Media Screen Installer..."
+  echo "Launching Media Screen with full installation..."
 
-  exec sudo mediascreen-util.sh 
+  if sudo ms-util --full-install --browser-users='mediascreen:tty1:https://app.novisign.com/wplayer/#/pages/home'; then
+    echo "MediaScreen installation completed successfully!"
+    rm .bash_profile 2>/dev/null || true
+  else
+    echo ""
+    echo "ERROR: MediaScreen installation failed!"
+    echo "Please check the error messages above for details."
+    echo ""
+    read -p "Press Enter to continue or Ctrl+C to exit..." 
+    exit 1
+  fi
 fi
