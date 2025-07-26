@@ -307,6 +307,72 @@ restart_service() {
     }
 }
 
+# Network utilities
+display_network_interfaces() {
+    local show_connections="${1:-true}"
+    
+    if [[ "$show_connections" == "true" ]]; then
+        log_debug "Displaying network connections..."
+        echo "=== Network Interface Information ==="
+        
+        # Show active connections
+        if command -v nmcli >/dev/null 2>&1; then
+            echo "Active connections:"
+            nmcli connection show --active | grep -v "DEVICE" | while read -r line; do
+                echo "  $line"
+            done
+            echo
+        fi
+    fi
+    
+    # Show IP addresses
+    echo "IP addresses:"
+    ip addr show | grep "inet " | grep -v "127.0.0.1" | while read -r line; do
+        interface=$(echo "$line" | awk '{print $NF}')
+        ip=$(echo "$line" | awk '{print $2}')
+        echo "  $interface: $ip"
+    done
+    
+    if [[ "$show_connections" == "true" ]]; then
+        echo "=================================="
+    fi
+}
+
+display_ip_addresses() {
+    local format="${1:-simple}"
+    
+    # Get all IP addresses excluding localhost
+    local ips
+    ips=$(ip addr show | grep "inet " | grep -v "127.0.0.1" | awk '{print $2}' | cut -d'/' -f1)
+    
+    if [[ -n "$ips" ]]; then
+        case "$format" in
+            "simple")
+                # Simple format: just IPs
+                while read -r ip; do
+                    echo "  $ip"
+                done <<< "$ips"
+                ;;
+            "detailed")
+                # Detailed format: IP (interface)
+                while read -r ip; do
+                    # Get interface name for this IP
+                    local interface
+                    interface=$(ip addr show | grep -B1 "inet $ip" | head -1 | awk '{print $2}' | sed 's/:$//')
+                    echo "  $ip ($interface)"
+                done <<< "$ips"
+                ;;
+            "list")
+                # List format: one line, comma-separated
+                echo "$ips" | tr '\n' ',' | sed 's/,$//'
+                ;;
+        esac
+    else
+        echo "  No network interfaces configured"
+        return 1
+    fi
+}
+
 # Argument parsing helpers
 strip_quotes() {
     local value="$1"

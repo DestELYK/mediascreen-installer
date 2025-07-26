@@ -168,26 +168,7 @@ reconfigure_wifi() {
 }
 
 display_connections() {
-    log "Displaying network connections..."
-    echo "=== Network Interface Information ==="
-    
-    # Show active connections
-    if command -v nmcli >/dev/null 2>&1; then
-        echo "Active connections:"
-        nmcli connection show --active | grep -v "DEVICE" | while read -r line; do
-            echo "  $line"
-        done
-        echo
-    fi
-    
-    # Show IP addresses
-    echo "IP addresses:"
-    ip addr show | grep "inet " | grep -v "127.0.0.1" | while read -r line; do
-        interface=$(echo "$line" | awk '{print $NF}')
-        ip=$(echo "$line" | awk '{print $2}')
-        echo "  $interface: $ip"
-    done
-    echo "=================================="
+    display_network_interfaces true
 }
 
 configure_timezone() {

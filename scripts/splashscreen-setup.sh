@@ -36,10 +36,37 @@ init_common "splashscreen-setup"
 check_debian
 check_root
 
+# Exit prompt function (matching main branch style)
+exit_prompt() {
+    read -p "Do you want to exit? (y/n): " EXIT
+    if [[ $EXIT =~ ^[Yy]$ ]]; then
+        exit 1
+    fi
+}
+
+trap exit_prompt SIGINT
+
 # Parse arguments
+SPLASH_MODE=""
+for arg in "$@"; do
+    case $arg in
+        --splash-mode=*)
+            SPLASH_MODE="$(strip_quotes "${arg#*=}")"
+            ;;
+        --logo-url=*)
+            # This will be handled by parse_common_args
+            ;;
+    esac
+done
+
 if ! parse_common_args "$@"; then
     case $? in
-        2) exit 0 ;;  # Help was shown
+        2) 
+            echo "Additional splash screen options:"
+            echo "  --splash-mode=MODE     Splash screen mode (url|upload|manual|default)"
+            echo "  --logo-url=URL         Logo image URL (sets mode to 'url' automatically)"
+            exit 0
+            ;;
         *) 
             # Continue execution even if common args parsing had issues
             log_debug "parse_common_args returned non-zero, continuing anyway"
@@ -61,33 +88,11 @@ install_plymouth() {
         return 1
     }
     
-    local packages=(
-        "plymouth"
-        "plymouth-themes"
-        "python3"
-        "net-tools"
-    )
-    
-    for package in "${packages[@]}"; do
-        case $package in
-            "python3")
-                install_package "$package" "Python 3 (for web upload server)" || {
-                    log_warn "Python 3 installation failed - web upload will not be available"
-                }
-                ;;
-            "net-tools")
-                install_package "$package" "network tools (for port checking)" || {
-                    log_warn "Net-tools installation failed - may use alternative port checking"
-                }
-                ;;
-            *)
-                install_package "$package" || {
-                    log_error "Failed to install $package"
-                    return 1
-                }
-                ;;
-        esac
-    done
+    # Install packages using the simplified approach
+    install_package "plymouth plymouth-themes python3 net-tools" "Plymouth packages and utilities" || {
+        log_error "Failed to install Plymouth packages"
+        return 1
+    }
     
     log_info "Plymouth packages installed successfully"
 }
@@ -467,114 +472,160 @@ handle_web_upload() {
     fi
 }
 
-# Get watermark image
-get_watermark_image() {
-    local target_file="$TEMP_DIR/watermark.png"
+# Handle watermark setup
+setup_watermark() {
+    # Check if watermark already exists
+    if [[ -f "/usr/share/plymouth/themes/spinner/watermark.png" ]]; then
+        log_info "Watermark found."
+        if [[ "$AUTO_INSTALL" != "true" ]]; then
+            read -p "Do you want to modify the watermark? (y/n): " modify_answer
+            if [[ ! $modify_answer =~ ^[Yy]$ ]]; then
+                return 0
+            fi
+        else
+            # In auto mode, check if we should replace existing watermark
+            if [[ -n "$LOGO_URL" || "$SPLASH_MODE" == "url" || "$SPLASH_MODE" == "upload" ]]; then
+                log_info "Auto mode: Replacing existing watermark"
+            else
+                log_info "Auto mode: Keeping existing watermark"
+                return 0
+            fi
+        fi
+    fi
     
-    if [[ -n "$LOGO_URL" ]]; then
-        # Validate logo URL with fallback functionality
-        if validate_logo_url_with_fallback "$LOGO_URL"; then
-            # Use logo URL from command line
-            if download_watermark "$LOGO_URL" "$target_file"; then
-                echo "$target_file"
+    # Handle auto mode
+    if [[ "$AUTO_INSTALL" == "true" ]]; then
+        # Determine mode - logo-url takes precedence, then splash-mode, then smart default
+        local mode="$SPLASH_MODE"
+        
+        if [[ -n "$LOGO_URL" ]]; then
+            mode="url"
+            log_info "Auto mode: Using URL mode (logo-url provided)"
+        elif [[ -z "$mode" ]]; then
+            # Smart default: if no mode specified, check what's available
+            if [[ -f "/usr/share/plymouth/themes/spinner/watermark.png" ]]; then
+                log_info "Auto mode: Existing watermark found, keeping it"
                 return 0
             else
-                log_error "Failed to download image from validated logo URL"
-                # If we're in auto mode, fall back to upload mode
-                if [[ "$AUTO_INSTALL" == "true" ]]; then
-                    log_info "Auto mode: Logo URL failed, falling back to default theme"
-                    return 1
-                else
-                    log_info "Logo URL failed, switching to upload mode"
-                    return 2
-                fi
-            fi
-        else
-            # Fallback was triggered, LOGO_MODE is now "upload"
-            log_info "Logo URL validation failed, switching to upload mode"
-            # In auto mode, use default theme instead of upload
-            if [[ "$AUTO_INSTALL" == "true" ]]; then
-                log_info "Auto mode: Using default theme instead of upload mode"
-                return 1
-            else
-                return 2
+                log_info "Auto mode: No existing watermark, using upload server"
+                mode="upload"
             fi
         fi
-    fi
-    
-    # Handle based on current logo mode (may have been changed by fallback)
-    if [[ "$LOGO_MODE" == "upload" ]]; then
-        # In auto mode, don't use upload mode - use default theme
-        if [[ "$AUTO_INSTALL" == "true" ]]; then
-            log_info "Auto mode: Upload mode requested but not supported, using default theme"
-            return 1
-        else
-            # Signal upload mode to main function
-            return 2  # Special return code to indicate upload mode should be handled by main
-        fi
-    elif [[ "$AUTO_INSTALL" == "true" ]]; then
-        # Auto mode without logo URL - skip custom watermark
-        log_info "Auto mode: Skipping custom watermark, using default theme"
-        return 1  # Signal to use default theme
-    else
-        # Interactive mode
-        echo
-        echo "Splash screen image options:"
-        echo "1. Download from URL"
-        echo "2. Upload via web browser (recommended)"
-        echo "3. Upload file manually (via network/SCP)"
-        echo "4. Use default theme (no custom image)"
-        echo
         
-        while true; do
-            read -p "Choose an option (1-4): " choice
-            
-            case $choice in
-                1)
-                    while true; do
-                        read -p "Enter image URL (png, jpg, jpeg, gif, bmp): " image_url
-                        if [[ -n "$image_url" ]] && download_watermark "$image_url" "$target_file"; then
-                            echo "$target_file"
-                            return 0
-                        fi
-                        
-                        echo "Please try again with a valid image URL."
-                    done
-                    ;;
-                2)
-                    # Signal upload mode to main function
-                    return 2
-                    ;;
-                3)
-                    echo
-                    echo "Manual upload instructions:"
-                    echo "1. Upload your image file as 'watermark.png' to: /home/${SUDO_USER:-root}/"
-                    echo "2. Available IP addresses for file transfer:"
-                    ip addr show | grep "inet " | grep -v "127.0.0.1" | awk '{print "   -", $2}' | cut -d'/' -f1
-                    echo
-                    read -p "Press Enter after uploading the file..."
-                    
-                    local upload_file="/home/${SUDO_USER:-root}/watermark.png"
-                    if [[ -f "$upload_file" ]]; then
-                        cp "$upload_file" "$target_file"
-                        log_info "Watermark file found and copied"
-                        echo "$target_file"
+        case "$mode" in
+            "url")
+                if [[ -n "$LOGO_URL" ]]; then
+                    log_info "Auto mode: Downloading watermark from URL"
+                    if download_watermark "$LOGO_URL" "/usr/share/plymouth/themes/spinner/watermark.png"; then
+                        log_info "Watermark downloaded and installed successfully"
                         return 0
                     else
-                        echo "Watermark file not found at $upload_file"
-                        echo "Please try again."
+                        log_error "Failed to download watermark from URL in auto mode"
+                        return 1
                     fi
-                    ;;
-                4)
-                    log_info "Using default theme without custom watermark"
-                    return 1  # Signal to use default theme
-                    ;;
-                *)
-                    echo "Invalid choice. Please select 1-4."
-                    ;;
-            esac
-        done
+                else
+                    log_error "Auto mode: URL mode specified but no logo-url provided"
+                    return 1
+                fi
+                ;;
+            "upload")
+                log_info "Auto mode: Starting web upload server for watermark"
+                local watermark_file
+                if watermark_file=$(handle_web_upload "/usr/share/plymouth/themes/spinner/watermark.png"); then
+                    log_info "Watermark uploaded via web interface successfully"
+                    return 0
+                else
+                    log_warn "Auto mode: Web upload failed, proceeding without custom watermark"
+                    return 1
+                fi
+                ;;
+            "manual")
+                log_info "Auto mode: Manual mode not supported in auto install, skipping watermark"
+                return 1
+                ;;
+            "default"|"")
+                log_info "Auto mode: Using default theme without custom watermark"
+                return 1
+                ;;
+            *)
+                log_error "Auto mode: Invalid splash mode '$mode'. Valid modes: url, upload, manual, default"
+                return 1
+                ;;
+        esac
     fi
+    
+    # Interactive mode
+    echo
+    echo "Please choose an option:"
+    echo "1. Upload a file manually"
+    echo "2. Download from URL"
+    echo "3. Upload via web interface (recommended)"
+    echo "4. Skip watermark"
+    echo
+    
+    while true; do
+        read -p "Enter your choice (1-4): " choice
+        
+        case $choice in
+            1)
+                echo "Please upload the watermark.png file to /home/${SUDO_USER:-root}/"
+                echo "Available IP addresses:"
+                ip addr show | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | grep -v '127.0.0.1'
+                echo
+                read -p "Press Enter after uploading the file..."
+                
+                local upload_file="/home/${SUDO_USER:-root}/watermark.png"
+                if [[ -f "$upload_file" ]]; then
+                    cp "$upload_file" "/usr/share/plymouth/themes/spinner/watermark.png"
+                    log_info "Watermark uploaded successfully"
+                    return 0
+                else
+                    echo "Watermark file not found at $upload_file"
+                    echo "Please try again."
+                fi
+                ;;
+            2)
+                local tries=0
+                while [[ $tries -lt 3 ]]; do
+                    read -p "Enter the URL of the watermark image: " url
+                    
+                    if validate_image_url "$url"; then
+                        if download_watermark "$url" "/usr/share/plymouth/themes/spinner/watermark.png"; then
+                            log_info "Watermark downloaded successfully"
+                            return 0
+                        else
+                            echo "Failed to download the watermark image. Please try again."
+                        fi
+                    else
+                        echo "Invalid URL. Please try again."
+                    fi
+                    tries=$((tries + 1))
+                done
+                
+                if [[ $tries -eq 3 ]]; then
+                    echo "Failed to download watermark after 3 attempts."
+                    echo "Please choose another option."
+                fi
+                ;;
+            3)
+                log_info "Starting web upload interface..."
+                local watermark_file
+                if watermark_file=$(handle_web_upload "/usr/share/plymouth/themes/spinner/watermark.png"); then
+                    log_info "Watermark uploaded via web interface successfully"
+                    return 0
+                else
+                    echo "Web upload failed. Please try another option."
+                fi
+                ;;
+            4)
+                log_info "Skipping watermark setup"
+                return 1
+                ;;
+            *)
+                echo "Invalid choice. Please select 1-4."
+                ;;
+        esac
+    done
 }
 
 # Create custom Plymouth theme
@@ -705,23 +756,6 @@ choose_default_theme() {
     set_plymouth_theme "text"
 }
 
-# Test Plymouth configuration
-test_plymouth() {
-    log_info "Testing Plymouth configuration..."
-    
-    # Check current theme
-    local current_theme
-    current_theme=$(plymouth-set-default-theme)
-    
-    if [[ -n "$current_theme" ]]; then
-        log_info "Current Plymouth theme: $current_theme"
-        return 0
-    else
-        log_error "No Plymouth theme is set"
-        return 1
-    fi
-}
-
 # Main execution
 main() {
     log_info "Starting splash screen setup..."
@@ -729,47 +763,47 @@ main() {
     # Install Plymouth
     install_plymouth || report_failure "Plymouth installation"
     
-    # Show available themes in debug mode
-    if [[ "${DEBUG:-false}" == "true" ]]; then
-        list_available_themes
+    # Handle watermark setup
+    setup_watermark
+    local watermark_result=$?
+    
+    # Configure Plymouth theme based on watermark setup
+    if [[ $watermark_result -eq 0 ]]; then
+        # Watermark was set up successfully, configure spinner theme
+        log_info "Configuring spinner theme with watermark..."
+        
+        # Update VerticalAlignment and WatermarkVerticalAlignment
+        sed -i 's/VerticalAlignment=.*/VerticalAlignment=.8/' /usr/share/plymouth/themes/spinner/spinner.plymouth
+        sed -i 's/WatermarkVerticalAlignment=.*/WatermarkVerticalAlignment=.5/' /usr/share/plymouth/themes/spinner/spinner.plymouth
+        
+        # Set spinner theme as default
+        plymouth-set-default-theme -R spinner || {
+            log_error "Failed to set spinner theme"
+            return 1
+        }
+        
+        log_info "Spinner theme with watermark configured successfully"
+    else
+        # No watermark, use default theme
+        log_info "Setting up default Plymouth theme..."
+        choose_default_theme || report_failure "Default theme setup"
     fi
     
-    # Handle watermark and theme setup
-    local watermark_result
-    local watermark_file
+    # Create long splash configuration
+    log_info "Creating long splash configuration..."
+    if [[ ! -d "/etc/systemd/system/plymouth-quit.service.d" ]]; then
+        mkdir -p /etc/systemd/system/plymouth-quit.service.d
+    fi
     
-    # Get watermark image and handle different return codes
-    watermark_file=$(get_watermark_image)
-    watermark_result=$?
+    cat > /etc/systemd/system/plymouth-quit.service.d/long_splash.conf << 'EOF'
+[Unit]
+Description=Make Plymouth Boot Screen last longer
+
+[Service]
+ExecStartPre=/usr/bin/sleep 5
+EOF
     
-    case $watermark_result in
-        0)
-            # Custom watermark provided successfully
-            log_info "Setting up custom splash screen with watermark"
-            create_custom_theme "$watermark_file" || report_failure "Custom theme creation"
-            set_plymouth_theme "$CUSTOM_THEME_NAME" || report_failure "Custom theme activation"
-            ;;
-        2)
-            # Upload mode triggered - start upload server
-            log_info "Starting upload server for watermark image"
-            if watermark_file=$(handle_web_upload "$TEMP_DIR/watermark.png") && [[ -n "$watermark_file" ]]; then
-                log_info "Setting up custom splash screen with uploaded watermark"
-                create_custom_theme "$watermark_file" || report_failure "Custom theme creation"
-                set_plymouth_theme "$CUSTOM_THEME_NAME" || report_failure "Custom theme activation"
-            else
-                log_info "Upload failed, using default theme"
-                choose_default_theme || report_failure "Default theme setup"
-            fi
-            ;;
-        *)
-            # Use default theme (return code 1 or any other error)
-            log_info "Setting up default splash screen theme"
-            choose_default_theme || report_failure "Default theme setup"
-            ;;
-    esac
-    
-    # Test configuration
-    test_plymouth || log_warn "Plymouth configuration test had issues"
+    log_info "Plymouth configuration completed successfully"
     
     report_success "Splash screen setup"
     
@@ -782,7 +816,7 @@ main() {
         current_theme=$(plymouth-set-default-theme)
         echo "- Active theme: $current_theme"
         
-        if [[ "$current_theme" == "$CUSTOM_THEME_NAME" ]]; then
+        if [[ "$current_theme" == "spinner" && -f "/usr/share/plymouth/themes/spinner/watermark.png" ]]; then
             echo "- Custom watermark image configured"
         fi
         

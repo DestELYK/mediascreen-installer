@@ -436,10 +436,53 @@ full_install() {
         fi
     done
     
+    echo
+    echo "=========================================="
+    echo "     MediaScreen Installation Complete!"
+    echo "=========================================="
+    echo
+    echo "Configuration Summary:"
+    echo "  Username: $username"
+    echo "  Browser configurations:"
+    IFS=',' read -ra BROWSER_PAIRS <<< "$browser_users"
+    for pair in "${BROWSER_PAIRS[@]}"; do
+        IFS=':' read -ra PARTS <<< "$pair"
+        echo "    ${PARTS[0]} -> ${PARTS[1]} -> ${PARTS[2]}"
+    done
+    
+    if [[ -n "$menu_tty" ]]; then
+        echo "  Menu autologin: root -> $menu_tty"
+    fi
+    
+    echo
+    echo "Network Information:"
+    echo "Available IP addresses:"
+    
+    # Display all available IP addresses using common library
+    if ! display_ip_addresses "detailed"; then
+        echo "  No network interfaces configured"
+    fi
+    
+    echo
+    echo "You can access MediaScreen using any of the above IP addresses."
+    echo "The system is ready to use after reboot."
+    echo
     echo "Full installation completed successfully!"
-    echo "Rebooting in 5 seconds..."
-    sleep 5
-    reboot
+    echo
+    
+    if [[ "$auto_mode" == "true" ]]; then
+        echo -n "Rebooting in "
+        for i in {10..1}; do
+            echo -n "$i..."
+            sleep 1
+        done
+        echo
+        echo "Rebooting now!"
+        reboot
+    else
+        read -p "Press Enter to reboot the system..."
+        reboot
+    fi
 }
 
 # Function to display the menu
