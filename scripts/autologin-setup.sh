@@ -530,41 +530,24 @@ reload_systemd_and_restart_getty() {
         return 1
     }
     
-    # Get current TTY to avoid restarting it
-    local current_tty=""
-    if [[ -t 0 ]]; then
-        current_tty=$(tty 2>/dev/null | sed 's#/dev/##' 2>/dev/null || true)
-    fi
-    
-    # Restart getty services that are enabled, except current TTY
+    # Restart getty services that are enabled
     for i in "${!BROWSER_USER_LIST[@]}"; do
         local tty="${BROWSER_TTY_LIST[$i]}"
         local service="getty@${tty}.service"
         
-        if [[ "$tty" == "$current_tty" ]]; then
-            log_info "Skipping restart of $service (current TTY)"
-            log_info "Changes will take effect on next login or reboot"
-        else
-            systemctl restart "$service" || {
-                log_warn "Failed to restart $service"
-            }
-        fi
+        systemctl restart "$service" || {
+            log_warn "Failed to restart $service"
+        }
     done
     
     if [[ -n "$MENU_TTY" ]]; then
         local service="getty@${MENU_TTY}.service"
-        
-        if [[ "$MENU_TTY" == "$current_tty" ]]; then
-            log_info "Skipping restart of $service (current TTY)"
-            log_info "Changes will take effect on next login or reboot"
-        else
-            systemctl restart "$service" || {
-                log_warn "Failed to restart $service"
-            }
-        fi
+        systemctl restart "$service" || {
+            log_warn "Failed to restart $service"
+        }
     fi
     
-    log_info "Services restarted successfully (current TTY skipped)"
+    log_info "Services restarted successfully"
 }
 
 # Interactive configuration
@@ -846,9 +829,6 @@ main() {
     # Manage getty services (mask unused ones)
     manage_getty_services || log_warn "Issues managing getty services"
     
-    # Reload systemd and restart services
-    reload_systemd_and_restart_getty || log_warn "Some services failed to restart"
-    
     report_success "Autologin configuration"
     
     if [[ "$AUTO_INSTALL" != "true" ]]; then
@@ -879,6 +859,10 @@ main() {
             log_info "Rebooting system..."
             reboot
         fi
+        
+    
+        # Reload systemd and restart services
+        reload_systemd_and_restart_getty || log_warn "Some services failed to restart"
     fi
 }
 
