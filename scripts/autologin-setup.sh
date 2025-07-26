@@ -45,22 +45,7 @@ check_root
 BROWSER_USERS=""
 MENU_TTY=""
 
-# Parse custom arguments
-for arg in "$@"; do
-    case $arg in
-        --browser-users=*)
-            BROWSER_USERS="${arg#*=}"
-            ;;
-        --menu-tty=*)
-            MENU_TTY="${arg#*=}"
-            ;;
-        *)
-            # Let common library handle other args
-            ;;
-    esac
-done
-
-# Parse common arguments
+# Parse common arguments first to set up GITHUB_BASE_URL and other common variables
 if ! parse_common_args "$@"; then
     case $? in
         2) 
@@ -77,6 +62,21 @@ if ! parse_common_args "$@"; then
             ;;
     esac
 fi
+
+# Parse custom arguments after common args are processed
+for arg in "$@"; do
+    case $arg in
+        --browser-users=*)
+            BROWSER_USERS="${arg#*=}"
+            ;;
+        --menu-tty=*)
+            MENU_TTY="${arg#*=}"
+            ;;
+        *)
+            # Skip common arguments that were already processed
+            ;;
+    esac
+done
 
 # Validate TTY format
 validate_tty() {
