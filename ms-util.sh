@@ -493,6 +493,37 @@ show_menu() {
     echo "+--------------------------------------------------------------------------------------+"
     echo "|                                MediaScreen Utility                                   |"
     echo "+--------------------------------------------------------------------------------------+"
+    
+    # Calculate padding for consistent line length (86 characters total)
+    local branch_text="Branch: $(if [[ "$USE_DEV" == "true" ]]; then echo "dev"; else echo "main"; fi)"
+    local branch_padding=$((84 - ${#branch_text}))
+    printf "| %s%*s |\n" "$branch_text" $branch_padding ""
+    
+    local debug_text="Debug Mode: $(if [[ "$DEBUG_MODE" == "true" ]]; then echo "Enabled"; else echo "Disabled"; fi)"
+    local debug_padding=$((84 - ${#debug_text}))
+    printf "| %s%*s |\n" "$debug_text" $debug_padding ""
+    
+    if [[ -n "$CUSTOM_GITHUB_URL" ]]; then
+        local url_text="Custom GitHub URL: $CUSTOM_GITHUB_URL"
+        local url_padding=$((84 - ${#url_text}))
+        printf "| %s%*s |\n" "$url_text" $url_padding ""
+    fi
+    
+    local ip_list
+    if ip_list=$(display_ip_addresses "list" 2>/dev/null); then
+        local ip_text="IP Addresses: $ip_list"
+        local ip_padding=$((84 - ${#ip_text}))
+        printf "| %s%*s |\n" "$ip_text" $ip_padding ""
+    else
+        local no_ip_text="IP Addresses: No network interfaces configured"
+        local no_ip_padding=$((84 - ${#no_ip_text}))
+        printf "| %s%*s |\n" "$no_ip_text" $no_ip_padding ""
+    fi
+    
+    echo "+--------------------------------------------------------------------------------------+"
+    echo 
+    
+    echo "Menu Options:"
     echo "0) Full Install"
     
     # Create array of menu items sorted by menu order
