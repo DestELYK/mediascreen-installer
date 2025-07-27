@@ -18,15 +18,16 @@ if [ -z $DISPLAY ] && [ $(tty) = /dev/tty1 ]; then
   chmod +x install.sh
 
   echo "Installing Media Screen components..."
-  sudo ./install.sh
+  if ! sudo ./install.sh; then
+    echo "Installation failed. Please check the error messages above for details."
+    exit 1
+  fi
 
   echo "Launching Media Screen with full installation..."
 
-  if sudo ms-util --full-install --browser-users='mediascreen:tty1:https://app.novisign.com/wplayer/#/pages/home'; then
-    echo "MediaScreen installation completed successfully!"
-  else
+  if ! sudo ms-util; then
     echo ""
-    echo "ERROR: MediaScreen installation failed!"
+    echo "ERROR: Failed to run ms-util!"
     echo "Please check the error messages above for details."
     echo ""
     read -p "Press Enter to continue or Ctrl+C to exit..." 
