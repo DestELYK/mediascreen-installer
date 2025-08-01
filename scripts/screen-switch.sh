@@ -304,6 +304,87 @@ interactive_selection() {
     fi
 }
 
+# Reload/restart specific TTY getty service
+reload_terminal() {
+    local target_number="$1"
+    
+    if [[ -z "$target_number" ]]; then
+        log_error "TTY number is required for reload command"
+        log_info "Usage: ms-switch reload <tty_number>"
+        return 1
+    fi
+    
+    # Validate that it's a number
+    if [[ ! "$target_number" =~ ^[0-9]+$ ]]; then
+        log_error "Invalid TTY number: $target_number (must be a number)"
+        return 1
+    fi
+    
+    log_info "Reloading TTY #$target_number..."
+    
+    # Get terminal list as array (only active/enabled ones)
+    local terminals=()
+    local tty_numbers=()
+    while IFS='|' read -r tty_device tty_name status; do
+        if [[ -n "$tty_device" ]]; then
+            terminals+=("$tty_name")
+            # Extract number from tty device (e.g., tty1 -> 1)
+            local tty_num=$(echo "$tty_device" | sed 's/tty//')
+            tty_numbers+=("$tty_num")
+        fi
+    done < <(get_terminals)
+    
+    # Validate terminal number against available terminals
+    if [[ $target_number -lt 1 || $target_number -gt ${#terminals[@]} ]]; then
+        log_error "Invalid TTY number: $target_number"
+        log_info "Available active TTYs: 1-${#terminals[@]}"
+        return 1
+    fi
+    
+    local target_tty_num="${tty_numbers[$((target_number - 1))]}"
+    local target_tty_name="${terminals[$((target_number - 1))]}"
+    local service="getty@tty${target_tty_num}.service"
+    
+    log_info "Target TTY: $target_tty_name (tty$target_tty_num)"
+    
+    # Check if target TTY exists
+    if [[ ! -c "/dev/tty${target_tty_num}" ]]; then
+        log_error "TTY device /dev/tty${target_tty_num} does not exist"
+        return 1
+    fi
+    
+    # Check if target TTY service exists and is not masked
+    local service_state=$(systemctl is-enabled "$service" 2>/dev/null || echo "disabled")
+    
+    if [[ "$service_state" == "masked" ]]; then
+        log_error "TTY $target_tty_num is masked and cannot be reloaded"
+        log_info "Use autologin-setup.sh to configure this TTY"
+        return 1
+    fi
+    
+    # Restart the getty service
+    log_info "Restarting $service..."
+    if systemctl restart "$service"; then
+        log_info "Successfully restarted $target_tty_name"
+        
+        # Wait a moment for the service to restart
+        sleep 2
+        
+        # Check service status after restart
+        local service_active=$(systemctl is-active "$service" 2>/dev/null || echo "inactive")
+        if [[ "$service_active" == "active" ]]; then
+            log_info "$target_tty_name is now active"
+        else
+            log_warn "$target_tty_name restart completed but service is $service_active"
+        fi
+        
+        return 0
+    else
+        log_error "Failed to restart $service"
+        return 1
+    fi
+}
+
 # Handle services that might need attention after TTY switch
 check_services_after_switch() {
     log_debug "Checking MediaScreen services after TTY switch..."
@@ -330,20 +411,22 @@ show_usage() {
     echo "Usage: ms-switch [OPTION|TTY_NUMBER]"
     echo
     echo "Options:"
-    echo "  list          List available TTY terminals"
-    echo "  status        Show current TTY terminal status"
-    echo "  -h, --help    Show this help message"
+    echo "  list              List available TTY terminals"
+    echo "  status            Show current TTY terminal status"
+    echo "  reload TTY_NUMBER Restart getty service for specified TTY"
+    echo "  -h, --help        Show this help message"
     echo
     echo "Arguments:"
-    echo "  TTY_NUMBER    Switch to specified TTY number (1, 2, 3, etc.)"
+    echo "  TTY_NUMBER        Switch to specified TTY number (1, 2, 3, etc.)"
     echo
     echo "Examples:"
-    echo "  ms-switch           # Interactive mode"
-    echo "  ms-switch list      # List available TTY terminals"
-    echo "  ms-switch 2         # Switch to TTY #2"
-    echo "  ms-switch status    # Show current TTY terminal info"
+    echo "  ms-switch             # Interactive mode"
+    echo "  ms-switch list        # List available TTY terminals"
+    echo "  ms-switch 2           # Switch to TTY #2"
+    echo "  ms-switch reload 1    # Restart getty service for TTY #1"
+    echo "  ms-switch status      # Show current TTY terminal info"
     echo
-    echo "Note: This command requires root privileges to switch terminals."
+    echo "Note: This command requires root privileges to switch terminals and restart services."
     echo
 }
 
@@ -363,6 +446,12 @@ main() {
             ;;
         "status"|"s")
             terminal_status
+            ;;
+        "reload"|"r")
+            # Reload/restart specific TTY
+            if ! reload_terminal "$2"; then
+                exit 1
+            fi
             ;;
         "-h"|"--help"|"help")
             show_usage

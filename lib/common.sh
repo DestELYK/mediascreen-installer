@@ -149,31 +149,19 @@ update_package_cache() {
 }
 
 install_package() {
-    local packages="$1"
-    local description="${2:-$packages}"
-    local no_recommends="${3:-false}"
+    local package="$1"
+    local description="${2:-$package}"
     
-    # Convert array notation to space-separated string if needed
-    if [[ "$packages" =~ ^\( ]]; then
-        # Remove parentheses and convert to space-separated
-        packages="${packages#(}"
-        packages="${packages%)}"
-        packages="${packages//\"}"
+    if ! dpkg -l | grep -q "^ii  $package "; then
+        log_info "Installing $description..."
+        apt install -y "$package" || {
+            log_error "Failed to install $package"
+            return 1
+        }
+        log_info "$description installed successfully"
+    else
+        log_debug "$description is already installed"
     fi
-    
-    log_info "Installing $description..."
-    
-    local apt_args="-y"
-    if [[ "$no_recommends" == "true" ]]; then
-        apt_args+=" --no-install-recommends"
-        log_debug "Installing packages without recommended packages"
-    fi
-    
-    apt install $apt_args $packages || {
-        log_error "Failed to install: $packages"
-        return 1
-    }
-    log_info "$description installed successfully"
 }
 
 # File operations
@@ -305,72 +293,6 @@ restart_service() {
         log_error "Failed to restart service: $service"
         return 1
     }
-}
-
-# Network utilities
-display_network_interfaces() {
-    local show_connections="${1:-true}"
-    
-    if [[ "$show_connections" == "true" ]]; then
-        log_debug "Displaying network connections..."
-        echo "=== Network Interface Information ==="
-        
-        # Show active connections
-        if command -v nmcli >/dev/null 2>&1; then
-            echo "Active connections:"
-            nmcli connection show --active | grep -v "DEVICE" | while read -r line; do
-                echo "  $line"
-            done
-            echo
-        fi
-    fi
-    
-    # Show IP addresses
-    echo "IP addresses:"
-    ip addr show | grep "inet " | grep -v "127.0.0.1" | while read -r line; do
-        interface=$(echo "$line" | awk '{print $NF}')
-        ip=$(echo "$line" | awk '{print $2}')
-        echo "  $interface: $ip"
-    done
-    
-    if [[ "$show_connections" == "true" ]]; then
-        echo "=================================="
-    fi
-}
-
-display_ip_addresses() {
-    local format="${1:-simple}"
-    
-    # Get all IP addresses excluding localhost
-    local ips
-    ips=$(ip addr show | grep "inet " | grep -v "127.0.0.1" | awk '{print $2}' | cut -d'/' -f1)
-    
-    if [[ -n "$ips" ]]; then
-        case "$format" in
-            "simple")
-                # Simple format: just IPs
-                while read -r ip; do
-                    echo "  $ip"
-                done <<< "$ips"
-                ;;
-            "detailed")
-                # Detailed format: IP (interface)
-                while read -r ip; do
-                    # Get interface name for this IP
-                    local interface
-                    interface=$(ip addr show | grep -B1 "inet $ip" | head -1 | awk '{print $2}' | sed 's/:$//')
-                    echo "  $ip ($interface)"
-                done <<< "$ips"
-                ;;
-            "list")
-                # List format: one line, comma-separated
-                echo "$ips" | tr '\n' ',' | sed 's/,$//'
-                ;;
-        esac
-    else
-        echo "  No network interfaces configured"
-        return 1
-    fi
 }
 
 # Argument parsing helpers
