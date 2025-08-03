@@ -182,6 +182,24 @@ while IFS="" read -r line || [ -n "$line" ]; do
     script_filenames+=("$filename")
 done < "$CONFIG_DIR/menu_config.txt"
 
+# Function to log to both console and log file
+log_both() {
+    local message="$1"
+    local timestamp="[$(date '+%Y-%m-%d %H:%M:%S')]"
+    local log_message="$timestamp $message"
+    
+    # Display to console
+    echo "$log_message"
+    
+    # Create log directory if it doesn't exist
+    local log_dir="/var/log/mediascreen"
+    mkdir -p "$log_dir"
+    
+    # Write to log file
+    local log_file="$log_dir/ms-util-install.log"
+    echo "$log_message" >> "$log_file"
+}
+
 # Full installation function (supports both interactive and automatic modes)
 full_install() {
     local auto_mode="${1:-false}"
@@ -190,7 +208,9 @@ full_install() {
     local menu_tty=""
     
     if [[ "$auto_mode" == "true" ]]; then
-        echo "Running automatic full install..."
+        log_both "Starting automatic full installation..."
+        log_both "Installation log: /var/log/mediascreen/ms-util-install.log"
+        echo
         
         # Use the predefined browser configuration
         browser_users="$AUTO_BROWSER_USERS"
@@ -202,12 +222,12 @@ full_install() {
         
         if parse_browser_users "$browser_users" parsed_browsers unique_usernames; then
             username="${unique_usernames[0]}"
-            echo "Username: $username"
-            echo "Browser configuration: $browser_users"
-            echo "Menu TTY: $menu_tty"
+            log_both "Username: $username"
+            log_both "Browser configuration: $browser_users"
+            log_both "Menu TTY: $menu_tty"
             echo
         else
-            echo "ERROR: Failed to parse browser configuration"
+            log_both "ERROR: Failed to parse browser configuration"
             exit 1
         fi
     else
@@ -330,7 +350,7 @@ full_install() {
 
     # Create user using common library
     if ! create_user_if_not_exists "$username"; then
-        echo "ERROR: Failed to create user: '$username'"
+        log_both "ERROR: Failed to create user: '$username'"
         if [[ "$auto_mode" == "true" ]]; then
             exit 1
         else
@@ -339,6 +359,8 @@ full_install() {
             return 1
         fi
     fi
+
+    log_both "Starting MediaScreen installation with username: $username"
 
     # Prepare common arguments for all scripts
     local common_args="-y"
@@ -357,6 +379,8 @@ full_install() {
     if [[ -n "$CUSTOM_GITHUB_URL" ]]; then
         common_args+=" --github-url='$CUSTOM_GITHUB_URL'"
     fi
+
+    log_both "Common script arguments: $common_args"
 
     # Create array of scripts sorted by run order, excluding items marked with _
     declare -a sorted_scripts
@@ -384,26 +408,28 @@ full_install() {
     IFS=$'\n' sorted_orders=($(sort -n <<< "${sorted_orders[*]}"))
     unset IFS
     
+    log_both "Executing $(${#sorted_orders[@]}) scripts in run order..."
+    
     # Execute scripts in run order
     for order_index in "${sorted_orders[@]}"; do
         local index="${order_index#*:}"
         local script="${script_filenames[$index]}"
         
         if [[ -f "$SCRIPTS_DIR/$script" ]]; then
-            echo "Running script: $script (run order: ${run_orders[$index]})"
+            log_both "Running script: $script (run order: ${run_orders[$index]})"
             
             # Use different argument patterns for different scripts
             case "$script" in
                 "configure-network.sh")
                     bash "$SCRIPTS_DIR/$script" $common_args || {
-                        echo "Failed to run script: $script. Continuing with remaining scripts..."
+                        log_both "Failed to run script: $script. Continuing with remaining scripts..."
                         sleep 3
                     }
                     ;;
                 "autologin-setup.sh")
                     if [[ "$auto_mode" == "true" ]]; then
                         # Automatic autologin setup with predefined browser configuration
-                        echo "Setting up autologin with predefined configuration..."
+                        log_both "Setting up autologin with predefined configuration..."
                     fi
                     
                     # Build arguments for autologin-setup.sh
@@ -412,10 +438,12 @@ full_install() {
                         autologin_args+=" --menu-tty='$menu_tty'"
                     fi
                     
+                    log_both "Autologin arguments: $autologin_args"
+                    
                     bash "$SCRIPTS_DIR/$script" $autologin_args || {
-                        echo "Failed to run script: $script."
+                        log_both "Failed to run script: $script."
                         if [[ "$auto_mode" == "true" ]]; then
-                            echo "Exiting..."
+                            log_both "Exiting..."
                             exit 1
                         else
                             echo "Exiting in 10 seconds..."
@@ -427,58 +455,61 @@ full_install() {
                 *)
                     # Run other scripts with common arguments
                     bash "$SCRIPTS_DIR/$script" $common_args || {
-                        echo "Failed to run script: $script. Continuing with remaining scripts..."
+                        log_both "Failed to run script: $script. Continuing with remaining scripts..."
                         sleep 3
                     }
                     ;;
             esac
+            
+            log_both "Completed script: $script"
         else
-            echo "Warning: Script $script not found, skipping..."
+            log_both "Warning: Script $script not found, skipping..."
         fi
     done
     
     echo
-    echo "=========================================="
-    echo "     MediaScreen Installation Complete!"
-    echo "=========================================="
+    log_both "=========================================="
+    log_both "     MediaScreen Installation Complete!"
+    log_both "=========================================="
     echo
-    echo "Configuration Summary:"
-    echo "  Username: $username"
-    echo "  Browser configurations:"
+    log_both "Configuration Summary:"
+    log_both "  Username: $username"
+    log_both "  Browser configurations:"
     IFS=',' read -ra BROWSER_PAIRS <<< "$browser_users"
     for pair in "${BROWSER_PAIRS[@]}"; do
         IFS=':' read -ra PARTS <<< "$pair"
-        echo "    ${PARTS[0]} -> ${PARTS[1]} -> ${PARTS[2]}"
+        log_both "    ${PARTS[0]} -> ${PARTS[1]} -> ${PARTS[2]}"
     done
     
     if [[ -n "$menu_tty" ]]; then
-        echo "  Menu autologin: root -> $menu_tty"
+        log_both "  Menu autologin: root -> $menu_tty"
     fi
     
     echo
-    echo "Network Information:"
-    echo "Available IP addresses:"
+    log_both "Network Information:"
+    log_both "Available IP addresses:"
     
     # Display all available IP addresses using common library
     if ! display_ip_addresses "detailed"; then
-        echo "  No network interfaces configured"
+        log_both "  No network interfaces configured"
     fi
     
     echo
-    echo "You can access MediaScreen using any of the above IP addresses."
-    echo "The system is ready to use after reboot."
+    log_both "You can access MediaScreen using any of the above IP addresses."
+    log_both "The system is ready to use after reboot."
     echo
-    echo "Full installation completed successfully!"
+    log_both "Full installation completed successfully!"
     echo
     
     if [[ "$auto_mode" == "true" ]]; then
+        log_both "Rebooting in $AUTO_REBOOT_TIME seconds..."
         echo -n "Rebooting in "
         for i in $(seq $AUTO_REBOOT_TIME -1 1); do
             echo -n "$i..."
             sleep 1
         done
         echo
-        echo "Rebooting now!"
+        log_both "Rebooting now!"
         reboot
     else
         read -p "Press Enter to reboot the system..."
