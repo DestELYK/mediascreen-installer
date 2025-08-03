@@ -151,10 +151,31 @@ update_package_cache() {
 install_package() {
     local package="$1"
     local description="${2:-$package}"
+    local no_recommends="${3:-false}"
     
-    if ! dpkg -l | grep -q "^ii  $package "; then
+    # Handle multiple packages in a single string
+    local packages_array=()
+    read -ra packages_array <<< "$package"
+    
+    # Check if all packages are already installed
+    local all_installed=true
+    for pkg in "${packages_array[@]}"; do
+        if ! dpkg -l | grep -q "^ii  $pkg "; then
+            all_installed=false
+            break
+        fi
+    done
+    
+    if [[ "$all_installed" == "false" ]]; then
         log_info "Installing $description..."
-        apt install -y "$package" || {
+        
+        # Build apt install command
+        local apt_cmd="apt install -y"
+        if [[ "$no_recommends" == "true" ]]; then
+            apt_cmd="$apt_cmd --no-install-recommends"
+        fi
+        
+        $apt_cmd $package || {
             log_error "Failed to install $package"
             return 1
         }
