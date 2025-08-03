@@ -5,5 +5,5 @@
 5,5,Splash Screen,Enables a splash screen when system is loading,splashscreen-setup.sh
 6,6,Auto Updates Setup,Enables automatic updates,autoupdates-setup.sh
 7,7,Reboot Setup,Configures automatic reboot scheduling,reboot-setup.sh
-8,8,MSM Client Setup,Installs and configures the MSM Client
+8,8,MSM Client Setup,Installs and configures the MSM Client,msm-client-setup.sh
 9,_,Screen Switch,Switch between TTY terminals,screen-switch.sh
