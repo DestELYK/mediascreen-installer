@@ -488,6 +488,13 @@ full_install() {
                         fi
                     }
                     ;;
+                "msm-client-setup.sh")
+                    # Run MSM client setup with common arguments
+                    execute_script_with_logging "$SCRIPTS_DIR/$script" install $common_args || {
+                        log_both "Failed to run script: $script. Continuing with remaining scripts..."
+                        sleep 3
+                    }
+                    ;;
                 *)
                     # Run other scripts with common arguments
                     execute_script_with_logging "$SCRIPTS_DIR/$script" $common_args || {
