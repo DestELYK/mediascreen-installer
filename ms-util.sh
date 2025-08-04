@@ -444,7 +444,7 @@ full_install() {
     IFS=$'\n' sorted_orders=($(sort -n <<< "${sorted_orders[*]}"))
     unset IFS
     
-    log_both "Executing $(${#sorted_orders[@]}) scripts in run order..."
+    log_both "Executing ${#sorted_orders[@]} scripts in run order..."
     
     # Execute scripts in run order
     for order_index in "${sorted_orders[@]}"; do

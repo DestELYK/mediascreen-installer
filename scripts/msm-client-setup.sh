@@ -520,7 +520,7 @@ SyslogIdentifier=msm-client
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
-ReadWritePaths=$INSTALL_DIR
+ReadWritePaths=$INSTALL_DIR /etc/msm-client /var/lib/msm-client
 PrivateTmp=yes
 
 # Environment
