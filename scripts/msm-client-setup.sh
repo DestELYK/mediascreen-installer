@@ -64,6 +64,7 @@ VERIFICATION_CODE_LENGTH=""
 VERIFICATION_CODE_ATTEMPTS=""
 PAIRING_CODE_EXPIRATION=""
 SCREEN_SWITCH_PATH=""
+AUTO_INSTALL="false"
 
 # Parse command line arguments
 parse_arguments() {
@@ -113,6 +114,9 @@ parse_arguments() {
                 --screen-switch-path=*)
                     SCREEN_SWITCH_PATH="$(strip_quotes "${1#*=}")"
                     ;;
+                -y|--yes|--auto)
+                    AUTO_INSTALL="true"
+                    ;;
                 -h|--help)
                     show_usage
                     exit 0
@@ -142,6 +146,7 @@ show_usage() {
     echo
     echo "Install Options:"
     echo "  Note: If no options are provided, interactive configuration mode will be used."
+    echo "  -y, --auto               Non-interactive mode with defaults"
     echo "  --status-update-interval=TIME   Status Update interval (e.g., 30s, 1m, 5m)"
     echo "  --disable-commands=BOOL  Disable command execution"
     echo "  --verification-code-length=NUM    Verification code length"
@@ -153,11 +158,14 @@ show_usage() {
     echo "  # Interactive installation (prompts for configuration)"
     echo "  msm-client-setup install"
     echo
+    echo "  # Non-interactive installation with defaults"
+    echo "  msm-client-setup install -y"
+    echo
     echo "  # Non-interactive installation with custom update interval"
-    echo "  msm-client-setup install --status-update-interval=1m"
+    echo "  msm-client-setup install -y --status-update-interval=1m"
     echo
     echo "  # Non-interactive installation with custom configuration"
-    echo "  msm-client-setup install --status-update-interval=30s --disable-commands=true --verification-code-length=8"
+    echo "  msm-client-setup install -y --status-update-interval=30s --disable-commands=true --verification-code-length=8"
     echo
     echo "  # Check service status"
     echo "  msm-client-setup status"
@@ -960,15 +968,9 @@ uninstall_client() {
 setup_msm_client() {
     log_info "Starting MSM client setup..."
     
-    # Check if any configuration options were provided via command line
-    local has_config_options=false
-    if [[ -n "$STATUS_UPDATE_INTERVAL" || -n "$DISABLE_COMMANDS" || -n "$VERIFICATION_CODE_LENGTH" || -n "$VERIFICATION_CODE_ATTEMPTS" || -n "$PAIRING_CODE_EXPIRATION" || -n "$SCREEN_SWITCH_PATH" ]]; then
-        has_config_options=true
-    fi
-    
-    # If no configuration options provided, use interactive mode
-    if [[ "$has_config_options" == "false" ]]; then
-        log_info "No configuration options provided, starting interactive configuration..."
+    # Use interactive mode unless -y flag was provided
+    if [[ "$AUTO_INSTALL" != "true" ]]; then
+        log_info "No -y flag provided, starting interactive configuration..."
         if ! interactive_config; then
             return 1
         fi

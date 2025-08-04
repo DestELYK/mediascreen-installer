@@ -320,7 +320,7 @@ main() {
     remove_existing_schedules || log_warn "Issues removing existing schedules"
     
     # Create new schedule
-    create_reboot_schedule "$REBOOT_DAY" "$REBOOT_TIME" || report_failure "Creating reboot schedule"
+    create_reboot_schedule "$REBOOT_TIME" "$REBOOT_DAY" || report_failure "Creating reboot schedule"
     
     # Test configuration
     test_cron || log_warn "Cron configuration test had issues"

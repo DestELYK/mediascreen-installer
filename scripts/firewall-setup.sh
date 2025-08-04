@@ -81,7 +81,8 @@ validate_subnet() {
 get_local_subnets() {
     local subnets=()
     
-    log_info "Detecting local network subnets..."
+    # Log to stderr to avoid interfering with stdout capture
+    log_info "Detecting local network subnets..." >&2
     
     # Get all IPv4 addresses except localhost and docker
     while read -r ip interface; do
@@ -92,7 +93,7 @@ get_local_subnets() {
             
             if [[ -n "$network_addr" && ! " ${subnets[*]} " =~ " ${network_addr} " ]]; then
                 subnets+=("$network_addr")
-                log_debug "Found subnet: $network_addr on interface $interface"
+                log_debug "Found subnet: $network_addr on interface $interface" >&2
             fi
         fi
     done < <(ip addr show | grep "inet " | grep -v "127.0.0.1" | grep -v "docker" | awk '{print $2, $NF}')

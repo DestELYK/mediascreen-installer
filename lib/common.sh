@@ -75,6 +75,101 @@ check_internet() {
     return 1
 }
 
+# Network interface functions
+display_ip_addresses() {
+    local mode="${1:-detailed}"
+    local interfaces_found=false
+    
+    case "$mode" in
+        "list")
+            # Return comma-separated list of IP addresses
+            local ip_list=""
+            while read -r line; do
+                if [[ $line =~ inet\ ([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+) ]]; then
+                    local ip="${BASH_REMATCH[1]}"
+                    if [[ "$ip" != "127.0.0.1" ]]; then
+                        if [[ -n "$ip_list" ]]; then
+                            ip_list+=", "
+                        fi
+                        ip_list+="$ip"
+                        interfaces_found=true
+                    fi
+                fi
+            done < <(ip addr show 2>/dev/null)
+            
+            if [[ "$interfaces_found" == "true" ]]; then
+                echo "$ip_list"
+                return 0
+            else
+                return 1
+            fi
+            ;;
+        "detailed")
+            # Display detailed interface information
+            while read -r line; do
+                if [[ $line =~ ^[0-9]+:\ ([^:]+): ]]; then
+                    local interface="${BASH_REMATCH[1]}"
+                    if [[ "$interface" != "lo" ]]; then
+                        local ip_info=$(ip addr show "$interface" 2>/dev/null | grep "inet " | head -1)
+                        if [[ $ip_info =~ inet\ ([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+) ]]; then
+                            local ip="${BASH_REMATCH[1]}"
+                            echo "  $interface: $ip"
+                            interfaces_found=true
+                        fi
+                    fi
+                fi
+            done < <(ip link show 2>/dev/null)
+            
+            if [[ "$interfaces_found" == "true" ]]; then
+                return 0
+            else
+                return 1
+            fi
+            ;;
+        *)
+            log_error "Invalid display mode: $mode. Use 'list' or 'detailed'"
+            return 1
+            ;;
+    esac
+}
+
+display_network_interfaces() {
+    local show_details="${1:-false}"
+    
+    echo "Network Interfaces:"
+    
+    while read -r line; do
+        if [[ $line =~ ^[0-9]+:\ ([^:]+): ]]; then
+            local interface="${BASH_REMATCH[1]}"
+            if [[ "$interface" != "lo" ]]; then
+                local status="DOWN"
+                local ip="No IP"
+                
+                # Check if interface is up
+                if ip link show "$interface" 2>/dev/null | grep -q "state UP"; then
+                    status="UP"
+                fi
+                
+                # Get IP address if available
+                local ip_info=$(ip addr show "$interface" 2>/dev/null | grep "inet " | head -1)
+                if [[ $ip_info =~ inet\ ([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+) ]]; then
+                    ip="${BASH_REMATCH[1]}"
+                fi
+                
+                echo "  $interface: $status ($ip)"
+                
+                if [[ "$show_details" == "true" && "$status" == "UP" ]]; then
+                    # Show additional details for active interfaces
+                    local mac=$(ip link show "$interface" 2>/dev/null | grep "link/ether" | awk '{print $2}')
+                    if [[ -n "$mac" ]]; then
+                        echo "    MAC: $mac"
+                    fi
+                fi
+            fi
+        fi
+    done < <(ip link show 2>/dev/null)
+}
+
 # User management
 validate_username() {
     local username="$1"

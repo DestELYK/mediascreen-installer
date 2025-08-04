@@ -237,6 +237,13 @@ full_install() {
     local menu_tty=""
     
     if [[ "$auto_mode" == "true" ]]; then
+        # Check if the log file exists and remove it
+        log_file="/var/log/mediascreen/ms-util-install.log"
+        if [[ -f "$log_file" ]]; then
+            rm -f "$log_file"
+            echo "Existing log file removed: $log_file"
+        fi
+
         log_both "Starting automatic full installation..."
         log_both "Installation log: /var/log/mediascreen/ms-util-install.log"
         echo
