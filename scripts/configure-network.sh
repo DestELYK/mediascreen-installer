@@ -168,7 +168,7 @@ reconfigure_wifi() {
 }
 
 display_connections() {
-    display_network_interfaces true
+    display_ip_addresses "interfaces" "true"
 }
 
 configure_timezone() {
