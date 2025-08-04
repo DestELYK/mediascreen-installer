@@ -200,6 +200,35 @@ log_both() {
     echo "$log_message" >> "$log_file"
 }
 
+# Function to execute script with logging
+execute_script_with_logging() {
+    local script_path="$1"
+    shift
+    local script_args="$@"
+    local log_file="/var/log/mediascreen/ms-util-install.log"
+    
+    # Execute script and capture both stdout and stderr
+    # Use a temporary file to capture the output
+    local temp_output="/tmp/script_output_$$"
+    
+    # Run the script and tee output to both console and temp file
+    if bash "$script_path" $script_args 2>&1 | tee "$temp_output"; then
+        # Append the captured output to the log file with timestamps
+        while IFS= read -r line; do
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] SCRIPT: $line" >> "$log_file"
+        done < "$temp_output"
+        rm -f "$temp_output"
+        return 0
+    else
+        # Append the captured output to the log file with timestamps even on failure
+        while IFS= read -r line; do
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] SCRIPT: $line" >> "$log_file"
+        done < "$temp_output"
+        rm -f "$temp_output"
+        return 1
+    fi
+}
+
 # Full installation function (supports both interactive and automatic modes)
 full_install() {
     local auto_mode="${1:-false}"
@@ -421,7 +450,7 @@ full_install() {
             # Use different argument patterns for different scripts
             case "$script" in
                 "configure-network.sh")
-                    bash "$SCRIPTS_DIR/$script" $common_args || {
+                    execute_script_with_logging "$SCRIPTS_DIR/$script" $common_args || {
                         log_both "Failed to run script: $script. Continuing with remaining scripts..."
                         sleep 3
                     }
@@ -440,7 +469,7 @@ full_install() {
                     
                     log_both "Autologin arguments: $autologin_args"
                     
-                    bash "$SCRIPTS_DIR/$script" $autologin_args || {
+                    execute_script_with_logging "$SCRIPTS_DIR/$script" $autologin_args || {
                         log_both "Failed to run script: $script."
                         if [[ "$auto_mode" == "true" ]]; then
                             log_both "Exiting..."
@@ -454,7 +483,7 @@ full_install() {
                     ;;
                 *)
                     # Run other scripts with common arguments
-                    bash "$SCRIPTS_DIR/$script" $common_args || {
+                    execute_script_with_logging "$SCRIPTS_DIR/$script" $common_args || {
                         log_both "Failed to run script: $script. Continuing with remaining scripts..."
                         sleep 3
                     }
