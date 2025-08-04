@@ -516,13 +516,6 @@ StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=msm-client
 
-# Security settings
-NoNewPrivileges=yes
-ProtectSystem=strict
-ProtectHome=yes
-ReadWritePaths=$INSTALL_DIR /etc/msm-client /var/lib/msm-client
-PrivateTmp=yes
-
 # Environment
 Environment=HOME=/root
 WorkingDirectory=$INSTALL_DIR
