@@ -249,10 +249,24 @@ create_user_if_not_exists() {
 # Package management
 update_package_cache() {
     log_info "Updating package cache..."
-    apt update -qq || {
+    
+    # Capture apt update output to a temporary file
+    local apt_log_file="${TEMP_DIR}/apt_update_$$.log"
+    if apt update >"$apt_log_file" 2>&1; then
+        log_info "Package cache updated successfully"
+        # Clean up log file on success
+        rm -f "$apt_log_file"
+    else
         log_error "Failed to update package cache"
+        if [[ -f "$apt_log_file" ]]; then
+            echo "Last 5 lines of apt update output:"
+            tail -5 "$apt_log_file" | while IFS= read -r line; do
+                echo "  $line"
+            done
+            rm -f "$apt_log_file"
+        fi
         return 1
-    }
+    fi
 }
 
 install_package() {
@@ -282,11 +296,23 @@ install_package() {
             apt_cmd="$apt_cmd --no-install-recommends"
         fi
         
-        $apt_cmd $package || {
+        # Capture apt output to a temporary file
+        local apt_log_file="${TEMP_DIR}/apt_install_$$.log"
+        if $apt_cmd $package >"$apt_log_file" 2>&1; then
+            log_info "$description installed successfully"
+            # Clean up log file on success
+            rm -f "$apt_log_file"
+        else
             log_error "Failed to install $package"
+            if [[ -f "$apt_log_file" ]]; then
+                echo "Last 5 lines of apt install output:"
+                tail -5 "$apt_log_file" | while IFS= read -r line; do
+                    echo "  $line"
+                done
+                rm -f "$apt_log_file"
+            fi
             return 1
-        }
-        log_info "$description installed successfully"
+        fi
     else
         log_debug "$description is already installed"
     fi
