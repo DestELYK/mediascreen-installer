@@ -364,11 +364,22 @@ full_install() {
         echo
         echo "=== Configuration Summary ==="
         echo "Browser autologins:"
-        IFS=',' read -ra BROWSER_PAIRS <<< "$browser_users"
-        for pair in "${BROWSER_PAIRS[@]}"; do
-            IFS=':' read -ra PARTS <<< "$pair"
-            echo "  ${PARTS[0]} -> ${PARTS[1]} -> ${PARTS[2]}"
-        done
+        
+        # Parse browser configuration using common library
+        declare -A summary_browsers
+        declare -a summary_usernames
+        
+        if parse_browser_users "$browser_users" summary_browsers summary_usernames; then
+            for tty in "${!summary_browsers[@]}"; do
+                # Format: user:url (where url may contain colons)
+                local config="${summary_browsers[$tty]}"
+                local user="${config%%:*}"  # Everything before first colon
+                local url="${config#*:}"    # Everything after first colon
+                echo "  $user -> $tty -> $url"
+            done
+        else
+            echo "  Error parsing browser configuration"
+        fi
         
         if [[ -n "$menu_tty" ]]; then
             echo "Menu autologin: root -> $menu_tty"
@@ -518,11 +529,22 @@ full_install() {
     log_both "Configuration Summary:"
     log_both "  Username: $username"
     log_both "  Browser configurations:"
-    IFS=',' read -ra BROWSER_PAIRS <<< "$browser_users"
-    for pair in "${BROWSER_PAIRS[@]}"; do
-        IFS=':' read -ra PARTS <<< "$pair"
-        log_both "    ${PARTS[0]} -> ${PARTS[1]} -> ${PARTS[2]}"
-    done
+    
+    # Parse browser configuration using common library
+    declare -A install_browsers
+    declare -a install_usernames
+    
+    if parse_browser_users "$browser_users" install_browsers install_usernames; then
+        for tty in "${!install_browsers[@]}"; do
+            # Format: user:url (where url may contain colons)
+            local config="${install_browsers[$tty]}"
+            local user="${config%%:*}"  # Everything before first colon
+            local url="${config#*:}"    # Everything after first colon
+            log_both "    $user -> $tty -> $url"
+        done
+    else
+        log_both "    Error parsing browser configuration"
+    fi
     
     if [[ -n "$menu_tty" ]]; then
         log_both "  Menu autologin: root -> $menu_tty"
