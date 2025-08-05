@@ -117,36 +117,10 @@ if [[ "$FULL_INSTALL" == "true" ]]; then
         exit 1
     fi
     
-    # Validate browser-users format using common library
-    declare -A parsed_browsers
-    declare -a unique_usernames
-    
-    if ! parse_browser_users "$AUTO_BROWSER_USERS" parsed_browsers unique_usernames; then
-        echo "ERROR: Browser-users validation failed"
-        exit 1
-    fi
-    
-    # Get the first username and browser count from parsed results
-    first_user="${unique_usernames[0]}"
-    browser_count="${#parsed_browsers[@]}"
-    
     # Set default menu TTY if not provided
     if [[ -z "$AUTO_MENU_TTY" ]]; then
         AUTO_MENU_TTY="tty12"
     fi
-    
-    echo "INFO: Full install configuration:"
-    echo "  Username: $first_user"
-    echo "  Browser configurations ($browser_count):"
-    for tty in "${!parsed_browsers[@]}"; do
-        IFS=':' read -ra PARTS <<< "${parsed_browsers[$tty]}"
-        echo "    ${PARTS[0]} -> $tty -> ${PARTS[1]}"
-    done
-    echo "  Menu: root -> $AUTO_MENU_TTY"
-    echo
-    
-    log "Full install mode enabled with browser configurations: $AUTO_BROWSER_USERS"
-    log "Menu TTY: $AUTO_MENU_TTY"
 fi
 
 # Check if MediaScreen is installed
@@ -248,24 +222,34 @@ full_install() {
         log_both "Installation log: /var/log/mediascreen/ms-util-install.log"
         echo
         
-        # Use the predefined browser configuration
-        browser_users="$AUTO_BROWSER_USERS"
-        menu_tty="$AUTO_MENU_TTY"
-        
-        # Extract username from browser configuration using common library
+        # Validate and parse browser configuration using common library
         declare -A parsed_browsers
         declare -a unique_usernames
         
-        if parse_browser_users "$browser_users" parsed_browsers unique_usernames; then
-            username="${unique_usernames[0]}"
-            log_both "Username: $username"
-            log_both "Browser configuration: $browser_users"
-            log_both "Menu TTY: $menu_tty"
-            echo
-        else
-            log_both "ERROR: Failed to parse browser configuration"
+        if ! parse_browser_users "$AUTO_BROWSER_USERS" parsed_browsers unique_usernames; then
+            log_both "ERROR: Browser-users validation failed"
             exit 1
         fi
+        
+        # Get the first username and browser count from parsed results
+        username="${unique_usernames[0]}"
+        browser_count="${#parsed_browsers[@]}"
+        
+        log_both "INFO: Full install configuration:"
+        log_both "  Usernames: ${username[@]}"
+        log_both "  Browser configurations ($browser_count):"
+        for tty in "${!parsed_browsers[@]}"; do
+            config="${parsed_browsers[$tty]}"
+            user="${config%%:*}"  # Everything before first colon
+            url="${config#*:}"    # Everything after first colon
+            log_both "    $user -> $tty -> $url"
+        done
+        log_both "  Menu: root -> $AUTO_MENU_TTY"
+        echo
+        
+        # Use the predefined browser configuration
+        browser_users="$AUTO_BROWSER_USERS"
+        menu_tty="$AUTO_MENU_TTY"
     else
         echo "Running interactive full install..."
         echo
@@ -344,7 +328,7 @@ full_install() {
             fi
             browser_users+="$username:$browser_tty:$browser_url"
             
-            echo "✓ Added: $username on $browser_tty -> $browser_url"
+            echo "Added: $username on $browser_tty -> $browser_url"
             
             # Increment TTY for next browser
             current_tty=$((current_tty + 1))
