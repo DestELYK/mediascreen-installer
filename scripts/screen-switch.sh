@@ -206,6 +206,52 @@ terminal_status() {
     fi
 }
 
+# Handle potential display conflicts when switching TTYs
+handle_display_cleanup() {
+    local from_tty="$1"
+    local to_tty="$2"
+    
+    log_debug "Checking for display conflicts between TTY$from_tty and TTY$to_tty"
+    
+    # Check if there are any X11 processes that might conflict
+    local x_processes=$(pgrep -f "X.*:.*tty$to_tty" 2>/dev/null || true)
+    if [[ -n "$x_processes" ]]; then
+        log_debug "Found X11 processes on target TTY$to_tty"
+    fi
+    
+    # Check for hanging display processes
+    local display_processes=$(pgrep -f "startx\|X\|Xorg" 2>/dev/null || true)
+    if [[ -n "$display_processes" ]]; then
+        log_debug "Active display processes found: $display_processes"
+        
+        # Give them a moment to settle
+        sleep 1
+    fi
+    
+    return 0
+}
+
+# Check if TTY is responsive and ready for use
+verify_tty_responsive() {
+    local tty_num="$1"
+    local tty_device="/dev/tty${tty_num}"
+    
+    # Check if the TTY device is accessible
+    if [[ ! -c "$tty_device" ]]; then
+        log_debug "TTY device $tty_device is not accessible"
+        return 1
+    fi
+    
+    # Try to write a simple test to the TTY (non-destructive)
+    if echo -n "" > "$tty_device" 2>/dev/null; then
+        log_debug "TTY $tty_num is responsive"
+        return 0
+    else
+        log_debug "TTY $tty_num is not responsive"
+        return 1
+    fi
+}
+
 # Switch to specific TTY terminal
 switch_to_terminal() {
     local target_number="$1"
@@ -262,15 +308,55 @@ switch_to_terminal() {
             return 1
         fi
         
-        # Wait a moment for the service to start
-        sleep 1
+        # Wait for the service to fully start and be ready
+        log_info "Waiting for getty service to initialize..."
+        local wait_count=0
+        while [[ $wait_count -lt 10 ]]; do
+            sleep 1
+            local current_status=$(systemctl is-active "$service" 2>/dev/null || echo "inactive")
+            if [[ "$current_status" == "active" ]]; then
+                # Give it an extra moment to be fully ready for connections
+                sleep 2
+                break
+            fi
+            wait_count=$((wait_count + 1))
+        done
+        
+        # Verify service is actually active
+        local final_status=$(systemctl is-active "$service" 2>/dev/null || echo "inactive")
+        if [[ "$final_status" != "active" ]]; then
+            log_error "Getty service failed to start properly after 10 seconds"
+            return 1
+        fi
     fi
     
+    # Store current TTY for verification
+    local current_before=$(fgconsole 2>/dev/null || echo "unknown")
+    
+    # Handle potential display conflicts
+    handle_display_cleanup "$current_before" "$target_tty_num"
+    
     # Switch to target TTY
-    log_debug "Switching to TTY $target_tty_num..."
+    log_debug "Switching to TTY $target_tty_num (from TTY $current_before)..."
     if chvt "$target_tty_num"; then
-        log_info "Successfully switched to $target_tty_name"
-        return 0
+        # Verify the switch was successful
+        sleep 1
+        local current_after=$(fgconsole 2>/dev/null || echo "unknown")
+        
+        if [[ "$current_after" == "$target_tty_num" ]]; then
+            log_info "Successfully switched to $target_tty_name"
+            
+            # Additional verification: check if the TTY is responsive
+            if ! verify_tty_responsive "$target_tty_num"; then
+                log_warn "TTY $target_tty_num may not be fully responsive"
+                log_info "You may need to reload the getty service if you encounter issues"
+            fi
+            
+            return 0
+        else
+            log_error "Switch appeared to succeed but current TTY is $current_after, expected $target_tty_num"
+            return 1
+        fi
     else
         log_error "Failed to switch to $target_tty_name"
         log_info "Make sure you have permission to switch virtual terminals"
@@ -365,15 +451,34 @@ reload_terminal() {
     # Restart the getty service
     log_info "Restarting $service..."
     if systemctl restart "$service"; then
-        log_info "Successfully restarted $target_tty_name"
+        log_info "Getty service restart command completed"
         
-        # Wait a moment for the service to restart
-        sleep 2
+        # Wait for the service to fully restart and be ready
+        log_info "Waiting for getty service to initialize after restart..."
+        local wait_count=0
+        while [[ $wait_count -lt 15 ]]; do
+            sleep 1
+            local current_status=$(systemctl is-active "$service" 2>/dev/null || echo "inactive")
+            if [[ "$current_status" == "active" ]]; then
+                # Give it an extra moment to be fully ready for connections
+                sleep 2
+                break
+            fi
+            wait_count=$((wait_count + 1))
+        done
         
         # Check service status after restart
         local service_active=$(systemctl is-active "$service" 2>/dev/null || echo "inactive")
         if [[ "$service_active" == "active" ]]; then
             log_info "$target_tty_name is now active"
+            
+            # Verify TTY responsiveness
+            if verify_tty_responsive "$target_tty_num"; then
+                log_info "$target_tty_name is responsive and ready for use"
+            else
+                log_warn "$target_tty_name may not be fully responsive yet"
+                log_info "Give it a few more moments before switching to this TTY"
+            fi
         else
             log_warn "$target_tty_name restart completed but service is $service_active"
         fi
@@ -402,6 +507,113 @@ check_services_after_switch() {
     # Show current TTY status after switch
     local current_tty=$(fgconsole 2>/dev/null || echo "unknown")
     log_info "Now on TTY: $current_tty"
+    
+    # Additional diagnostics for troubleshooting
+    log_debug "Post-switch diagnostics:"
+    log_debug "- Current TTY: $current_tty"
+    log_debug "- Active consoles: $(cat /sys/class/tty/console/active 2>/dev/null || echo 'unknown')"
+    
+    # Check for any display-related processes that might be causing issues
+    local x_procs=$(pgrep -f "X\|startx\|Xorg" 2>/dev/null || true)
+    if [[ -n "$x_procs" ]]; then
+        log_debug "- Active X11 processes: $x_procs"
+    fi
+}
+
+# Run comprehensive diagnostics to help troubleshoot switching issues
+run_diagnostics() {
+    log_info "Running comprehensive TTY diagnostics..."
+    echo
+    
+    # Basic TTY info
+    echo "=== Basic TTY Information ==="
+    local current_tty=$(fgconsole 2>/dev/null || echo "unknown")
+    echo "Current TTY: $current_tty"
+    
+    if [[ -f "/sys/class/tty/console/active" ]]; then
+        local active_consoles=$(cat /sys/class/tty/console/active 2>/dev/null || echo "unknown")
+        echo "Active consoles: $active_consoles"
+    fi
+    echo
+    
+    # Display processes
+    echo "=== Display-Related Processes ==="
+    local x_procs=$(pgrep -af "X\|startx\|Xorg" 2>/dev/null || echo "None found")
+    echo "X11 processes:"
+    if [[ "$x_procs" != "None found" ]]; then
+        echo "$x_procs" | while read -r line; do
+            echo "  $line"
+        done
+    else
+        echo "  $x_procs"
+    fi
+    echo
+    
+    # Getty services status
+    echo "=== Getty Services Status ==="
+    for tty_num in {1..12}; do
+        local service="getty@tty${tty_num}.service"
+        local service_state=$(systemctl is-enabled "$service" 2>/dev/null || echo "disabled")
+        local service_active=$(systemctl is-active "$service" 2>/dev/null || echo "inactive")
+        
+        if [[ "$service_state" != "disabled" ]] || [[ "$service_active" != "inactive" ]]; then
+            echo "  tty${tty_num}: $service_state ($service_active)"
+            
+            # Check autologin configuration
+            local override_file="/etc/systemd/system/getty@tty${tty_num}.service.d/override.conf"
+            if [[ -f "$override_file" ]]; then
+                local autologin_user=$(grep -o '\--autologin [^ ]*' "$override_file" 2>/dev/null | awk '{print $2}' || echo "")
+                if [[ -n "$autologin_user" ]]; then
+                    echo "    └─ Autologin: $autologin_user"
+                fi
+            fi
+            
+            # Check TTY responsiveness
+            if verify_tty_responsive "$tty_num"; then
+                echo "    └─ Status: Responsive"
+            else
+                echo "    └─ Status: Not responsive"
+            fi
+        fi
+    done
+    echo
+    
+    # TTY device status
+    echo "=== TTY Device Status ==="
+    for tty_num in {1..12}; do
+        local tty_device="/dev/tty${tty_num}"
+        if [[ -c "$tty_device" ]]; then
+            local perms=$(ls -l "$tty_device" 2>/dev/null | awk '{print $1,$3,$4}')
+            echo "  $tty_device: exists ($perms)"
+        fi
+    done
+    echo
+    
+    # Kernel messages related to TTY
+    echo "=== Recent TTY-related Kernel Messages ==="
+    local tty_messages=$(dmesg | grep -i "tty\|console\|vt" | tail -10 2>/dev/null || echo "No recent messages")
+    if [[ "$tty_messages" != "No recent messages" ]]; then
+        echo "$tty_messages" | while read -r line; do
+            echo "  $line"
+        done
+    else
+        echo "  $tty_messages"
+    fi
+    echo
+    
+    # Environment checks
+    echo "=== Environment Checks ==="
+    echo "User: $(whoami)"
+    echo "Groups: $(groups 2>/dev/null || echo "unknown")"
+    echo "TERM: ${TERM:-unset}"
+    echo "DISPLAY: ${DISPLAY:-unset}"
+    echo
+    
+    log_info "Diagnostics complete. If you're experiencing black screens, check:"
+    log_info "1. Getty services are active for the target TTY"
+    log_info "2. TTY devices are responsive"
+    log_info "3. No conflicting X11 processes"
+    log_info "4. Proper autologin configuration if needed"
 }
 
 # Show usage information
@@ -414,6 +626,7 @@ show_usage() {
     echo "  list              List available TTY terminals"
     echo "  status            Show current TTY terminal status"
     echo "  reload TTY_NUMBER Restart getty service for specified TTY"
+    echo "  diagnose          Show detailed diagnostic information"
     echo "  -h, --help        Show this help message"
     echo
     echo "Arguments:"
@@ -425,6 +638,7 @@ show_usage() {
     echo "  ms-switch 2           # Switch to TTY #2"
     echo "  ms-switch reload 1    # Restart getty service for TTY #1"
     echo "  ms-switch status      # Show current TTY terminal info"
+    echo "  ms-switch diagnose    # Show detailed diagnostic information"
     echo
     echo "Note: This command requires root privileges to switch terminals and restart services."
     echo
@@ -446,6 +660,9 @@ main() {
             ;;
         "status"|"s")
             terminal_status
+            ;;
+        "diagnose"|"d")
+            run_diagnostics
             ;;
         "reload"|"r")
             # Reload/restart specific TTY
