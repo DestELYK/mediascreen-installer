@@ -1,4 +1,10 @@
-if [ -z $DISPLAY ] && [ $(tty) = /dev/tty2 ]; then
+if [ -z $DISPLAY ] && [ $(tty) = /dev/tty1 ]; then
+  # Disable Ctrl+C and other interrupt signals
+  trap '' INT TERM QUIT
+
+  # Disable job control to prevent Ctrl+Z
+  set +m
+
   echo "Waiting for connection..."
   while ! ping -c 1 -W 1 google.com >/dev/null; do
     sleep 1
@@ -17,9 +23,26 @@ if [ -z $DISPLAY ] && [ $(tty) = /dev/tty2 ]; then
 
   chmod +x install.sh
 
-  sudo mv install.sh /usr/local/bin/mediascreen-util.sh
+  echo "Installing Media Screen components..."
+  if ! sudo ./install.sh; then
+    echo "Installation failed. Please check the error messages above for details."
+    read -p "Press Enter to Continue"
+    exit 1
+  fi
 
-  echo "Launching Media Screen Installer..."
+  echo "Launching Media Screen with full installation..."
 
-  exec sudo mediascreen-util.sh 
+  # Loop to prevent exit to shell - restart ms-util if it exits
+  while true; do
+    if sudo ms-util; then
+      echo "MediaScreen completed successfully. Restarting..."
+      sleep 2
+    else
+      echo ""
+      echo "ERROR: Failed to run ms-util!"
+      echo "Please check the error messages above for details."
+      echo "Restarting in 5 seconds..."
+      sleep 5
+    fi
+  done
 fi

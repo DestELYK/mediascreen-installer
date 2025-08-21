@@ -1,0 +1,3 @@
+if [ -z $DISPLAY ] && [[ $(tty) =~ ^/dev/tty[0-9]+$ ]]; then
+    exec startx &>/dev/null
+fi
